@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A Developer's Day on the Microsoft Agentic Platform — Contoso Energy</title>
+<style>
+  :root{
+    --azure:#0078d4; --copilot:#2563eb; --foundry:#10b981; --sre:#f59e0b;
+    --fix:#7c3aed; --ink:#0b1220; --bg:#eef2f9; --card:#ffffff;
+    --text:#1e293b; --muted:#64748b; --border:#e2e8f0; --good:#16a34a; --bad:#ef4444;
+    --shadow:0 10px 30px rgba(15,23,42,.10);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  /* ---------- Top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; gap:12px; padding:12px 22px;
+    background:#fff; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:20;
+  }
+  .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.2px}
+  .brand .sq{width:22px;height:22px;border-radius:5px;background:
+     conic-gradient(from 0deg,#f25022 0 25%,#7fba00 0 50%,#00a4ef 0 75%,#ffb900 0 100%);}
+  .brand small{font-weight:500;color:var(--muted)}
+  .topbar .spacer{flex:1}
+  .topbar .who{font-size:12px;color:var(--muted);text-align:right}
+  /* ---------- Stepper ---------- */
+  .stepper{display:flex;gap:8px;flex-wrap:wrap;padding:14px 22px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:47px;z-index:19}
+  .step{
+    display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;border:1px solid var(--border);
+    background:#fff;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted);transition:.18s;white-space:nowrap;
+  }
+  .step .dot{width:9px;height:9px;border-radius:50%;background:#cbd5e1}
+  .step:hover{border-color:#cbd5e1}
+  .step.active{color:#fff;border-color:transparent}
+  .step.active .dot{background:rgba(255,255,255,.9)}
+  .step[data-c="open"].active{background:var(--ink)}
+  .step[data-c="write"].active{background:var(--copilot)}
+  .step[data-c="reason"].active{background:var(--foundry)}
+  .step[data-c="operate"].active{background:var(--sre)}
+  .step[data-c="fix"].active{background:var(--fix)}
+  .step[data-c="close"].active{background:var(--ink)}
+  .step.done .dot{background:var(--good)}
+  /* ---------- Stage ---------- */
+  .stage{max-width:1120px;margin:0 auto;padding:26px 22px 120px}
+  .scene{display:none;animation:fade .35s ease}
+  .scene.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .eyebrow{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px}
+  .scene-title{font-size:26px;font-weight:800;margin:6px 0 4px;color:var(--ink)}
+  .scene-sub{color:var(--muted);margin-bottom:20px}
+  .grid{display:grid;grid-template-columns:1.35fr .9fr;gap:20px;align-items:start}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}}
+  /* ---------- Mock window ---------- */
+  .win{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+  .win-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#f8fafc;border-bottom:1px solid var(--border)}
+  .win-bar .tl{display:flex;gap:6px}
+  .win-bar .tl i{width:11px;height:11px;border-radius:50%;display:inline-block}
+  .tl i:nth-child(1){background:#ff5f57}.tl i:nth-child(2){background:#febc2e}.tl i:nth-child(3){background:#28c840}
+  .win-bar .t{font-size:12.5px;color:var(--muted);font-weight:600;margin-left:4px}
+  .win-body{padding:14px;font-size:13px}
+  .code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;background:#0b1220;color:#e6edf7;border-radius:9px;padding:13px 14px;overflow:auto}
+  .code .k{color:#7dd3fc}.code .s{color:#86efac}.code .c{color:#64748b}.code .f{color:#c4b5fd}
+  .editor{display:grid;grid-template-columns:150px 1fr;gap:0;border-radius:9px;overflow:hidden;border:1px solid #16233b}
+  .tree{background:#0b1220;color:#94a3b8;font-family:ui-monospace,monospace;font-size:12px;padding:12px}
+  .tree .fl{padding:2px 0}.tree .on{color:#e6edf7;background:#16233b;border-radius:5px;padding:2px 6px;margin:0 -6px}
+  .copilot-chat{margin-top:12px;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+  .cc-head{background:#eff4ff;color:var(--copilot);font-weight:700;font-size:12px;padding:7px 11px;display:flex;align-items:center;gap:7px}
+  .cc-body{padding:11px}
+  .bubble{background:#f1f5f9;border-radius:9px;padding:9px 11px;font-size:12.5px;margin-bottom:8px}
+  .bubble.me{background:#eff4ff}
+  .kv{display:flex;gap:10px;padding:6px 0;border-bottom:1px dashed var(--border);font-size:12.5px}
+  .kv:last-child{border-bottom:0}.kv b{min-width:118px;color:var(--muted);font-weight:600}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
+  .pill.g{background:#ecfdf5;color:#047857}.pill.b{background:#eff4ff;color:#1d4ed8}
+  .pill.o{background:#fff7ed;color:#b45309}.pill.v{background:#f5f3ff;color:#6d28d9}
+  /* ---------- Side panel / agent card ---------- */
+  .side{display:flex;flex-direction:column;gap:16px}
+  .agent{background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;opacity:0;transform:translateY(10px)}
+  .agent.show{opacity:1;transform:none;transition:.45s cubic-bezier(.2,.7,.3,1)}
+  .agent .ah{padding:12px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+  .agent .ico{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:18px;color:#fff}
+  .agent .an{font-weight:800;font-size:14px}.agent .ar{font-size:11.5px;color:var(--muted)}
+  .agent .ab{padding:12px 14px}
+  .agent[data-p="write"] .ico,.agent[data-p="fix2"] .ico{background:var(--copilot)}
+  .agent[data-p="reason"] .ico{background:var(--foundry)}
+  .agent[data-p="operate"] .ico{background:var(--sre)}
+  .agent[data-p="fix"] .ico{background:var(--fix)}
+  .badge{display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;letter-spacing:.3px;margin:0 4px 4px 0}
+  .b-write,.b-fix2{background:#eff4ff;color:#1d4ed8}.b-reason{background:#ecfdf5;color:#047857}
+  .b-operate{background:#fff7ed;color:#b45309}.b-fix{background:#f5f3ff;color:#6d28d9}
+  .find{font-size:12.5px;padding:7px 0;border-bottom:1px dashed var(--border);display:flex;gap:8px}
+  .find:last-child{border-bottom:0}.find .mk{color:var(--good)}
+  .powered{font-size:11px;font-weight:800;letter-spacing:.4px;margin-top:10px;padding:8px 10px;border-radius:8px;text-transform:uppercase}
+  .p-write,.p-fix2{background:#eff4ff;color:#1d4ed8;border-left:3px solid var(--copilot)}
+  .p-reason{background:#ecfdf5;color:#047857;border-left:3px solid var(--foundry)}
+  .p-operate{background:#fff7ed;color:#b45309;border-left:3px solid var(--sre)}
+  .p-fix{background:#f5f3ff;color:#6d28d9;border-left:3px solid var(--fix)}
+  .handoff{margin-top:10px;font-size:12px;font-weight:700;color:var(--muted);background:#f8fafc;border:1px dashed var(--border);border-radius:8px;padding:9px 11px}
+  .narr{background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:14px 16px}
+  .narr h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+  .narr .say{font-size:14px;color:var(--ink);font-style:italic}
+  .why{margin-top:10px;font-size:12.5px;color:var(--muted)}
+  .why b{color:var(--text)}
+  .optional{margin-top:16px;border:1px dashed var(--foundry);border-radius:12px;padding:12px 14px;background:#f0fdf9}
+  .optional h4{margin:0 0 8px;font-size:12px;color:#047857;text-transform:uppercase;letter-spacing:.6px}
+  .optional .opt{font-size:12.5px;margin:6px 0}
+  /* ---------- Hero ---------- */
+  .hero{background:linear-gradient(135deg,#0b1220 0%,#15233f 60%,#1b3a6b 100%);color:#fff;border-radius:18px;padding:40px 34px;box-shadow:var(--shadow)}
+  .hero .eb{color:#93c5fd}
+  .hero h1{font-size:34px;line-height:1.15;margin:8px 0 10px;font-weight:800}
+  .hero p.lead{font-size:15px;color:#cbd5e1;max-width:640px}
+  .loop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:26px 0}
+  .node{padding:10px 14px;border-radius:11px;font-weight:800;font-size:13px;color:#fff;display:flex;align-items:center;gap:8px}
+  .node small{display:block;font-weight:500;font-size:10.5px;opacity:.85}
+  .n-write{background:var(--copilot)}.n-reason{background:var(--foundry)}.n-operate{background:var(--sre)}.n-fix{background:var(--fix)}
+  .arrow{color:#64748b;font-size:20px;font-weight:800}
+  .loopback{font-size:11.5px;color:#93c5fd;margin-top:-8px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:#cbd5e1}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .quote{margin-top:22px;border-left:3px solid #3b82f6;padding:6px 0 6px 14px;color:#e2e8f0;font-size:14px;font-style:italic;max-width:660px}
+  .btn{display:inline-flex;align-items:center;gap:8px;border:0;cursor:pointer;font-weight:700;font-size:14px;padding:12px 20px;border-radius:10px;background:var(--azure);color:#fff;transition:.15s}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.25)}
+  .btn.lg{margin-top:26px}
+  /* ---------- Governance / close ---------- */
+  .arch{background:#0b1220;color:#e6edf7;border-radius:16px;padding:28px 26px;box-shadow:var(--shadow)}
+  .band{background:#15233f;border:1px solid #24406e;border-radius:12px;padding:14px 16px;margin:12px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .band .lab{font-size:11px;font-weight:800;letter-spacing:.5px;color:#93c5fd;min-width:120px;text-transform:uppercase}
+  .gov{background:linear-gradient(90deg,#1e293b,#243b66);border:1px dashed #3b82f6;border-radius:12px;padding:12px 16px;margin:12px 0;font-size:13px}
+  .gov b{color:#fff}
+  .close-line{font-size:17px;font-weight:700;margin:20px 0 8px;color:#fff}
+  .cta{background:#0e7490;background:linear-gradient(90deg,#0078d4,#3b82f6);border-radius:12px;padding:14px 18px;margin-top:16px;font-weight:700}
+  /* ---------- HITL ---------- */
+  .hitl{border:2px solid var(--fix);border-radius:12px;padding:14px 16px;background:#faf7ff;margin-top:12px}
+  .hitl h4{margin:0 0 6px;color:#6d28d9;font-size:13px;display:flex;align-items:center;gap:8px}
+  .hitl .steps{margin-top:10px;font-size:13px}
+  .hitl .st{padding:6px 0;opacity:0;transform:translateX(-6px);transition:.4s}
+  .hitl .st.show{opacity:1;transform:none}
+  .diff{font-family:ui-monospace,monospace;font-size:12px;border-radius:9px;overflow:hidden;border:1px solid var(--border);margin-top:8px}
+  .diff div{padding:3px 10px}
+  .diff .add{background:#e7f8ec;color:#065f46}.diff .del{background:#fdecec;color:#991b1b}.diff .ctx{background:#f8fafc;color:#64748b}
+  /* ---------- Footer nav ---------- */
+  .foot{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:12px 22px;z-index:20}
+  .foot .count{font-size:12.5px;color:var(--muted);font-weight:600}
+  .foot .spacer{flex:1}
+  .navbtn{border:1px solid var(--border);background:#fff;border-radius:9px;padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;color:var(--text);transition:.15s}
+  .navbtn:hover{border-color:#94a3b8}
+  .navbtn.primary{background:var(--azure);color:#fff;border-color:transparent}
+  .navbtn:disabled{opacity:.4;cursor:not-allowed}
+  .tip{font-size:11.5px;color:var(--muted)}
+  .kbd{font-family:ui-monospace,monospace;font-size:11px;border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:1px 5px;background:#f8fafc}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="sq"></span> Microsoft &nbsp;<small>Agentic Platform · Interactive storyboard</small></div>
+    <div class="spacer"></div>
+    <div class="who">Contoso Energy · 60-min developer demo<br>Backup / click-through — runs fully offline</div>
+  </div>
+
+  <div class="stepper" id="stepper">
+    <div class="step" data-c="open"    onclick="goTo(0)"><span class="dot"></span>Open</div>
+    <div class="step" data-c="write"   onclick="goTo(1)"><span class="dot"></span>1 · Write</div>
+    <div class="step" data-c="reason"  onclick="goTo(2)"><span class="dot"></span>2 · Reason</div>
+    <div class="step" data-c="operate" onclick="goTo(3)"><span class="dot"></span>3 · Operate</div>
+    <div class="step" data-c="fix"     onclick="goTo(4)"><span class="dot"></span>4 · Fix</div>
+    <div class="step" data-c="close"   onclick="goTo(5)"><span class="dot"></span>Close</div>
+  </div>
+
+  <div class="stage">
+
+    <!-- ============ SCENE 0 — HERO ============ -->
+    <section class="scene active" id="s0">
+      <div class="hero">
+        <div class="eb eyebrow">A developer's day, end to end</div>
+        <h1>A Developer's Day on the<br>Microsoft Agentic Platform</h1>
+        <p class="lead">One hour. One small feature — built, shipped, and kept healthy — with an agent teammate at every stage and the developer in control at the decisions that matter.</p>
+
+        <div class="loop">
+          <div class="node n-write">✍️ Write<small>GitHub Copilot</small></div>
+          <span class="arrow">→</span>
+          <div class="node n-reason">🧠 Reason<small>Azure AI Foundry</small></div>
+          <span class="arrow">→</span>
+          <div class="node n-operate">👁️ Operate<small>Azure SRE Agent</small></div>
+          <span class="arrow">→</span>
+          <div class="node n-fix">🔧 Fix<small>Copilot coding agent</small></div>
+          <span class="arrow">↺</span>
+        </div>
+        <div class="loopback">↺ The loop closes — the operate stage hands work back to the build stage. Copilot bookends the hour.</div>
+
+        <div class="legend">
+          <span><i style="background:#2563eb"></i> GitHub Copilot</span>
+          <span><i style="background:#10b981"></i> Azure AI Foundry</span>
+          <span><i style="background:#f59e0b"></i> Azure SRE Agent</span>
+          <span><i style="background:#7c3aed"></i> Copilot coding agent</span>
+          <span><i style="background:#93c5fd"></i> Governance: APIM AI Gateway + Agent 365</span>
+        </div>
+
+        <div class="quote">"Other platforms give you an agent for one stage. Microsoft gives developers agents across the whole loop — on one platform, in your tenant, under one governance plane."</div>
+
+        <button class="btn lg" onclick="goTo(1)">Begin walkthrough →</button>
+      </div>
+    </section>
+
+    <!-- ============ SCENE 1 — WRITE ============ -->
+    <section class="scene" id="s1">
+      <div class="eyebrow" style="color:var(--copilot)">Pillar 1 · Write · 12 min</div>
+      <div class="scene-title">Code the feature with GitHub Copilot</div>
+      <div class="scene-sub">In VSCode, delegate a whole task — not autocomplete — and review the result.</div>
+      <div class="grid">
+        <div>
+          <div class="win">
+            <div class="win-bar"><span class="tl"><i></i><i></i><i></i></span><span class="t">BuildingAssist — Visual Studio Code</span></div>
+            <div class="win-body">
+              <div class="editor">
+                <div class="tree">
+                  <div class="fl">📁 buildingassist</div>
+                  <div class="fl on">&nbsp;&nbsp;energy.py</div>
+                  <div class="fl">&nbsp;&nbsp;agent_client.py</div>
+                  <div class="fl">&nbsp;&nbsp;test_energy.py</div>
+                  <div class="fl">&nbsp;&nbsp;Dockerfile</div>
+                </div>
+                <div class="code"><span class="c"># generated by Copilot agent mode</span><br><span class="k">@app</span>.get(<span class="s">"/energy"</span>)<br><span class="k">async def</span> <span class="f">energy</span>(floor:int, week:str):<br>&nbsp;&nbsp;ans = <span class="k">await</span> agent.<span class="f">ask</span>(<br>&nbsp;&nbsp;&nbsp;&nbsp;<span class="s">f"Energy for floor {floor}, {week}?"</span>)<br>&nbsp;&nbsp;<span class="k">return</span> {<span class="s">"answer"</span>:ans.text,<br>&nbsp;&nbsp;&nbsp;&nbsp;<span class="s">"sources"</span>:ans.citations}</div>
+              </div>
+              <div class="copilot-chat">
+                <div class="cc-head">🟦 GitHub Copilot · agent mode</div>
+                <div class="cc-body">
+                  <div class="bubble me">Add an endpoint that calls our Foundry agent to answer an energy question and return it with sources. Add a test and a Dockerfile.</div>
+                  <div class="bubble">✅ Created <b>/energy</b> endpoint, <b>test_energy.py</b>, and a <b>Dockerfile</b>. Ran the test — passing. Ready to commit.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="side">
+          <div class="agent reveal" data-p="write">
+            <div class="ah"><div class="ico">🟦</div><div><div class="an">GitHub Copilot</div><div class="ar">Writes the feature — agent mode</div></div></div>
+            <div class="ab">
+              <span class="badge b-write">✍️ Write stage</span>
+              <div class="find"><span class="mk">✔</span> Generated endpoint, test, and container config from one instruction</div>
+              <div class="find"><span class="mk">✔</span> Ran the test locally — passing before commit</div>
+              <div class="powered p-write">🟦 Powered by GitHub Copilot</div>
+              <div class="handoff">📤 Feature built → commit &amp; CI/CD deploy to Azure; the app now calls the Foundry agent.</div>
+            </div>
+          </div>
+          <div class="narr">
+            <h4>Talk track</h4>
+            <div class="say">"This isn't autocomplete — I delegated a whole task and reviewed the result. That's the pattern for the whole hour."</div>
+            <div class="why"><b>Why Contoso Energy cares:</b> delivery velocity on billable work, consistency across a delivery practice, juniors productive on day one.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SCENE 2 — REASON ============ -->
+    <section class="scene" id="s2">
+      <div class="eyebrow" style="color:var(--foundry)">Pillar 2 · Reason · 14 min</div>
+      <div class="scene-title">See the agent in Azure AI Foundry</div>
+      <div class="scene-sub">The intelligence isn't hard-coded in the app — it's an agent in your tenant.</div>
+      <div class="grid">
+        <div>
+          <div class="win">
+            <div class="win-bar"><span class="tl"><i></i><i></i><i></i></span><span class="t">Azure AI Foundry — buildingassist-agent</span></div>
+            <div class="win-body">
+              <div class="kv"><b>Model</b><span>GPT-4o <span class="pill g">swappable — no app change</span></span></div>
+              <div class="kv"><b>Instructions</b><span>Answer building energy questions; always cite sources.</span></div>
+              <div class="kv"><b>Tools</b><span>Energy data connector · Foundry IQ retrieval</span></div>
+              <div class="kv"><b>Grounding</b><span><span class="pill g">Foundry IQ</span> building &amp; energy runbooks</span></div>
+              <div class="kv"><b>Runtime</b><span>Your Azure tenant · data stays in-tenant</span></div>
+              <div class="copilot-chat" style="margin-top:12px">
+                <div class="cc-head" style="background:#ecfdf5;color:#047857">🟩 Foundry playground</div>
+                <div class="cc-body">
+                  <div class="bubble me">How much energy did Floor 3 use this week?</div>
+                  <div class="bubble">Floor 3 used <b>1,240 kWh</b> this week (+6% vs last). <span class="pill g">source: energy-report-w29.pdf</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="optional">
+            <h4>⭐ Optional slot-ins — developer-platform beats</h4>
+            <div class="opt">🚦 <b>AI Gateway (APIM)</b> — route model calls through the GenAI gateway: token rate-limits, load-balancing across deployments, retries, managed identity. <i>Also the regression lever in scene 3.</i></div>
+            <div class="opt">📚 <b>Foundry IQ</b> — grounded answers with citations: "the difference between an agent that sounds right and one that's right."</div>
+          </div>
+        </div>
+        <div class="side">
+          <div class="agent reveal" data-p="reason">
+            <div class="ah"><div class="ico">🟩</div><div><div class="an">Foundry Agent</div><div class="ar">Reasons — tenant-resident</div></div></div>
+            <div class="ab">
+              <span class="badge b-reason">🧠 Reason stage</span>
+              <div class="find"><span class="mk">✔</span> Answers grounded in your docs, with citations (Foundry IQ)</div>
+              <div class="find"><span class="mk">✔</span> Model-flexible — swap without touching the app</div>
+              <div class="find"><span class="mk">✔</span> Runs in your tenant; data stays in-tenant</div>
+              <div class="powered p-reason">🟩 Powered by Azure AI Foundry</div>
+              <div class="handoff">📤 Agent live &amp; grounded → the app is deployed and serving; now let's keep it healthy.</div>
+            </div>
+          </div>
+          <div class="narr">
+            <h4>Talk track</h4>
+            <div class="say">"The intelligence is this agent — your tenant, your models, your guardrails. I can swap the model without touching the app."</div>
+            <div class="why"><b>Why Contoso Energy cares:</b> a platform, not a black box — tenant-resident, model-flexible, resellable to clients as a managed offer.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SCENE 3 — OPERATE ============ -->
+    <section class="scene" id="s3">
+      <div class="eyebrow" style="color:var(--sre)">Pillar 3 · Operate · 17 min</div>
+      <div class="scene-title">Keep it running with the Azure SRE Agent</div>
+      <div class="scene-sub">Meet the operator — then a routine regression, handled matter-of-factly.</div>
+      <div class="grid">
+        <div>
+          <div class="win">
+            <div class="win-bar"><span class="tl"><i></i><i></i><i></i></span><span class="t">Azure SRE Agent — buildingassist</span></div>
+            <div class="win-body">
+              <div class="kv"><b>Watching</b><span>Container App · Foundry endpoint · APIM gateway</span></div>
+              <div class="kv"><b>Access</b><span>Scoped, read-mostly <span class="pill o">least privilege</span></span></div>
+              <div class="kv"><b>Wired to</b><span>GitHub repo <span class="pill o">issue integration on</span></span></div>
+              <div style="margin-top:14px;border:1px solid #fed7aa;border-radius:10px;overflow:hidden">
+                <div style="background:#fff7ed;color:#b45309;font-weight:800;font-size:12px;padding:8px 12px">⚠️ Incident detected — routine regression</div>
+                <div style="padding:12px;font-size:12.5px">
+                  <div style="margin-bottom:6px">Error rate <b style="color:var(--bad)">2% → 22%</b> · latency up after <b>deploy #128</b></div>
+                  <div style="background:#f8fafc;border-radius:8px;padding:10px;margin:8px 0"><b>Root cause (SRE Agent):</b> deploy #128 removed the timeout/retry on model calls; downstream Foundry calls now time out under load.</div>
+                  <div>→ Opened <b>GitHub issue #42</b> with diagnosis &amp; suggested fix.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="side">
+          <div class="agent reveal" data-p="operate">
+            <div class="ah"><div class="ico">🟧</div><div><div class="an">Azure SRE Agent</div><div class="ar">Operates — triage &amp; RCA</div></div></div>
+            <div class="ab">
+              <span class="badge b-operate">👁️ Operate stage</span>
+              <div class="find"><span class="mk">✔</span> Detected the regression, correlated to deploy #128</div>
+              <div class="find"><span class="mk">✔</span> Read logs across app + Foundry + APIM → wrote a plain-language root cause</div>
+              <div class="find"><span class="mk">✔</span> Opened a GitHub issue — a diagnosis, not a red dashboard</div>
+              <div class="powered p-operate">🟧 Powered by Azure SRE Agent</div>
+              <div class="handoff">📤 Root cause written → GitHub issue #42 opened, ready to assign to a coding agent.</div>
+            </div>
+          </div>
+          <div class="narr">
+            <h4>Talk track</h4>
+            <div class="say">"It didn't hand me a red dashboard — it handed me a diagnosis and a GitHub issue. That's triage done — one capability among peers, right next to the two you already saw."</div>
+            <div class="why"><b>Why Contoso Energy cares:</b> the managed-services multiplier — L1/L2 triage before a human is paged; one engineer supervising many more services.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SCENE 4 — FIX (HITL) ============ -->
+    <section class="scene" id="s4">
+      <div class="eyebrow" style="color:var(--fix)">Pillar 1 returns · Fix · 9 min</div>
+      <div class="scene-title">The Copilot coding agent closes the loop</div>
+      <div class="scene-sub">The operate stage hands work back to the build stage — you make one decision: the merge.</div>
+      <div class="grid">
+        <div>
+          <div class="win">
+            <div class="win-bar"><span class="tl"><i></i><i></i><i></i></span><span class="t">GitHub — contoso-energy/buildingassist</span></div>
+            <div class="win-body">
+              <div class="kv"><b>Issue #42</b><span>Timeouts on model calls after deploy #128 <span class="pill o">from SRE Agent</span></span></div>
+              <div class="kv"><b>Assigned to</b><span><span class="pill v">🟦 Copilot coding agent</span></span></div>
+              <div class="kv"><b>Pull request #43</b><span>Add timeout + retry to agent client <span class="pill v">opened autonomously</span></span></div>
+              <div class="diff">
+                <div class="ctx">  async def ask(self, prompt):</div>
+                <div class="del">-   return await self.client.call(prompt)</div>
+                <div class="add">+   return await self.client.call(prompt,</div>
+                <div class="add">+       timeout=8, retries=3, backoff=True)</div>
+              </div>
+
+              <div class="hitl">
+                <h4>⏸️ Human-in-the-loop — you decide</h4>
+                <div style="font-size:12.5px;color:var(--muted)">An agent found it, an agent fixed it — a human ships it.</div>
+                <button class="btn" style="background:var(--fix);margin-top:10px" id="mergeBtn" onclick="doMerge()">Review &amp; approve the PR →</button>
+                <div class="steps" id="mergeSteps">
+                  <div class="st" data-i="1">✅ <b>Approved &amp; merged</b> PR #43</div>
+                  <div class="st" data-i="2">🚀 CI/CD <b>redeploying</b> (deploy #129)…</div>
+                  <div class="st" data-i="3">🟢 SRE Agent confirms: error rate back to <b>2%</b> — <b>healthy</b></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="side">
+          <div class="agent reveal" data-p="fix">
+            <div class="ah"><div class="ico">🟦</div><div><div class="an">Copilot coding agent</div><div class="ar">Fixes — opens a PR</div></div></div>
+            <div class="ab">
+              <span class="badge b-fix">🔧 Fix stage</span>
+              <div class="find"><span class="mk">✔</span> Took issue #42 and implemented the fix autonomously</div>
+              <div class="find"><span class="mk">✔</span> Opened PR #43 with timeout + retry</div>
+              <div class="find">⏸️ Waits for a human to review &amp; merge</div>
+              <div class="powered p-fix2">🟦 Powered by GitHub Copilot</div>
+              <div class="handoff">📤 Merged &amp; redeployed → SRE Agent verifies healthy. The loop is closed.</div>
+            </div>
+          </div>
+          <div class="narr">
+            <h4>Talk track</h4>
+            <div class="say">"The operate agent handed work back to the build agent. The loop closed itself — and I made exactly one decision, the merge. Same platform, start to finish."</div>
+            <div class="why"><b>Why Contoso Energy cares:</b> MTTR collapses while a human stays in control at the one moment that matters.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SCENE 5 — CLOSE ============ -->
+    <section class="scene" id="s5">
+      <div class="eyebrow" style="color:var(--azure)">Close · 3 min</div>
+      <div class="scene-title">One platform. Your tenant. Governed.</div>
+      <div class="scene-sub">Reveal the whole loop only after the outcome has landed — it's a closer, not an opener.</div>
+      <div class="arch">
+        <div class="band"><span class="lab">✍️ Write</span> GitHub Copilot in VSCode — delegate whole tasks, review results</div>
+        <div class="band"><span class="lab">🧠 Reason</span> Azure AI Foundry agent (+ Foundry IQ) — grounded, model-flexible, tenant-resident</div>
+        <div class="band"><span class="lab">👁️ Operate</span> Azure SRE Agent — detect, correlate, root-cause, open a GitHub issue</div>
+        <div class="band"><span class="lab">🔧 Fix</span> Copilot coding agent — autonomous PR → human merge → redeploy</div>
+        <div class="gov">🚦 <b>APIM AI Gateway</b> governs every <b>model call</b> — cost, quota, routing, security.</div>
+        <div class="gov">🛡️ <b>Agent 365</b> governs every <b>agent</b> — observability, lifecycle, identity, DLP. <i>"Agents managed with the same rigour as users, apps, and devices."</i></div>
+        <div class="close-line">"Microsoft gives developers agents across the whole loop — write, reason, operate, fix — on one platform, in your tenant, under one governance plane."</div>
+        <div class="cta">👉 Next step: pick one internal app and let's run this exact loop with your team in a workshop.</div>
+      </div>
+      <div style="margin-top:18px;display:flex;gap:10px">
+        <button class="btn" onclick="goTo(0)">↺ Restart</button>
+        <button class="btn ghost" style="background:#e2e8f0;color:#1e293b" onclick="goTo(1)">Replay the loop</button>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="foot">
+    <span class="count" id="count">Scene 1 of 6</span>
+    <span class="tip">Navigate with <span class="kbd">←</span> <span class="kbd">→</span> or the steps above</span>
+    <span class="spacer"></span>
+    <button class="navbtn" id="prev" onclick="prev()">← Back</button>
+    <button class="navbtn primary" id="next" onclick="next()">Next →</button>
+  </div>
+
+<script>
+  var current = 0;
+  var total = 6;
+  var titles = ["Open","Write","Reason","Operate","Fix","Close"];
+
+  function goTo(i){
+    if(i<0||i>=total) return;
+    current = i;
+    // scenes
+    for(var s=0;s<total;s++){
+      var el = document.getElementById('s'+s);
+      if(el) el.classList.toggle('active', s===i);
+    }
+    // stepper
+    var steps = document.querySelectorAll('.stepper .step');
+    steps.forEach(function(st,idx){
+      st.classList.toggle('active', idx===i);
+      st.classList.toggle('done', idx<i);
+    });
+    // footer
+    document.getElementById('count').textContent = 'Scene '+(i+1)+' of '+total+'  ·  '+titles[i];
+    document.getElementById('prev').disabled = (i===0);
+    document.getElementById('next').disabled = (i===total-1);
+    // reveal agent cards (staggered)
+    var active = document.getElementById('s'+i);
+    var cards = active.querySelectorAll('.reveal');
+    cards.forEach(function(c){ c.classList.remove('show'); });
+    cards.forEach(function(c,idx){ setTimeout(function(){ c.classList.add('show'); }, 180 + idx*260); });
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  function next(){ goTo(current+1); }
+  function prev(){ goTo(current-1); }
+
+  function doMerge(){
+    var btn = document.getElementById('mergeBtn');
+    btn.disabled = true; btn.textContent = 'Approving…';
+    var sts = document.querySelectorAll('#mergeSteps .st');
+    sts.forEach(function(st,idx){
+      setTimeout(function(){ st.classList.add('show'); }, 500 + idx*900);
+    });
+    setTimeout(function(){ btn.textContent = '✔ Merged'; }, 600);
+  }
+
+  document.addEventListener('keydown', function(e){
+    if(e.key==='ArrowRight') next();
+    if(e.key==='ArrowLeft') prev();
+  });
+
+  goTo(0);
+</script>
+</body>
+</html>

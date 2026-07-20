@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# uv
+# (keep uv.lock committed)
+
+# Node / frontend
+node_modules/
+dist/
+build/
+*.local
+
+# Azure Developer CLI
+.azure/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+*:Zone.Identifier
+.vscode/*
+!.vscode/extensions.json
