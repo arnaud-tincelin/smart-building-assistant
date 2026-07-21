@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: buildingassist
+metadata:
+    template: buildingassist@0.1.0
+services:
+    backend:
+        project: src/backend
+        host: containerapp
+        language: python
+        docker:
+            path: Dockerfile
+            remoteBuild: true
+    frontend:
+        project: src/frontend
+        host: containerapp
+        language: js
+        docker:
+            path: Dockerfile
+            remoteBuild: true
+        hooks:
+            prepackage:
+                posix:
+                    shell: sh
+                    run: npm ci && npm run build
+infra:
+    provider: microsoft.foundry
+    module: main
+hooks:
+    postprovision:
+        posix:
+            shell: sh
+            run: sh ./scripts/postprovision.sh
+            continueOnError: true

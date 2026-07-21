@@ -10,7 +10,8 @@
       "version": "stable"
     },
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "22"
+      "version": "22",
+      "pnpmVersion": "none"
     },
     "ghcr.io/devcontainers/features/github-cli:1": {
       "version": "latest"

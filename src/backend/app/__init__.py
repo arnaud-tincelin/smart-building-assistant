@@ -1,0 +1,1 @@
+"""BuildingAssist backend package."""

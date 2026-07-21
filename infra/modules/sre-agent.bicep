@@ -1,0 +1,175 @@
+metadata description = '''
+Azure SRE Agent (Microsoft.App/agents) — the operate pillar, now first-class in
+Bicep. Provisions the agent, its user-assigned identity with scoped read access to
+the resource group + Log Analytics, an Action Group as the incident entry point,
+and a metric alert on the backend that fires the staged regression into the agent.
+
+GitHub connection (open issues) and the incident-handler subagent/runbook are still
+configured in the agent Builder (data plane) post-provision — see docs/sre-agent.md.
+'''
+
+param location string
+param tags object
+param agentName string
+param identityName string
+param actionGroupName string
+param alertName string
+
+@description('Application Insights AppId — the agent reads traces/logs from here.')
+param appInsightsAppId string
+
+@description('Application Insights connection string (required alongside appId).')
+@secure()
+param appInsightsConnectionString string
+
+@description('Log Analytics workspace name — the agent gets Reader on it to run KQL.')
+param logAnalyticsName string
+
+@description('Backend Container App resource id — scope of the regression metric alert.')
+param backendAppId string
+
+var readerRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
+var monitoringReaderRoleId = '43d0d8ad-25c7-4714-9337-8ba259a9fe05'
+var logAnalyticsReaderRoleId = '73c42c96-874c-492b-b04d-ab87d138a893'
+
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: logAnalyticsName
+}
+
+resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: identityName
+  location: location
+  tags: tags
+}
+
+// Reader on the resource group: list + describe the watched resources (both
+// Container Apps, Foundry, APIM all live in this group).
+resource readerAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, identity.id, readerRoleId)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', readerRoleId)
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Monitoring Reader: read Azure Monitor alerts + metrics for correlation.
+resource monitoringReaderAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, identity.id, monitoringReaderRoleId)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', monitoringReaderRoleId)
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Log Analytics Reader on the workspace: run KQL across app + Foundry + APIM logs.
+resource logAnalyticsReaderAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(logAnalytics.id, identity.id, logAnalyticsReaderRoleId)
+  scope: logAnalytics
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', logAnalyticsReaderRoleId)
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Incident platform entry point: the metric alert fires into this action group,
+// and the SRE Agent is registered as a receiver on it.
+resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
+  name: actionGroupName
+  location: 'global'
+  tags: tags
+  properties: {
+    groupShortName: 'sreagent'
+    enabled: true
+  }
+}
+
+resource sreAgent 'Microsoft.App/agents@2026-01-01' = {
+  name: agentName
+  location: location
+  tags: tags
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${identity.id}': {}
+    }
+  }
+  properties: {
+    upgradeChannel: 'Stable'
+    knowledgeGraphConfiguration: {
+      identity: identity.id
+      // Empty: the agent discovers the watched resources via Reader on the whole
+      // resource group (both Container Apps, Foundry account, APIM).
+      managedResources: []
+    }
+    logConfiguration: {
+      applicationInsightsConfiguration: {
+        appId: appInsightsAppId
+        connectionString: appInsightsConnectionString
+      }
+    }
+    actionConfiguration: {
+      identity: identity.id
+      mode: 'Autonomous'
+      accessLevel: 'High'
+    }
+    defaultModel: {
+      provider: 'Anthropic'
+      name: 'Automatic'
+    }
+  }
+}
+
+// Staged-regression lever: a bad model deployment makes the backend return 502s.
+// This alert fires on backend 5xx responses and routes to the SRE Agent.
+resource backendErrorAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
+  name: alertName
+  location: 'global'
+  tags: tags
+  properties: {
+    description: 'BuildingAssist backend returning 5xx — the staged regression (bad model deployment) is active.'
+    severity: 2
+    enabled: true
+    scopes: [
+      backendAppId
+    ]
+    evaluationFrequency: 'PT1M'
+    windowSize: 'PT5M'
+    criteria: {
+      'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
+      allOf: [
+        {
+          name: 'Backend5xx'
+          metricNamespace: 'Microsoft.App/containerApps'
+          metricName: 'Requests'
+          operator: 'GreaterThan'
+          threshold: 0
+          timeAggregation: 'Total'
+          criterionType: 'StaticThresholdCriterion'
+          dimensions: [
+            {
+              name: 'statusCodeCategory'
+              operator: 'Include'
+              values: [
+                '5xx'
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    actions: [
+      {
+        actionGroupId: actionGroup.id
+      }
+    ]
+  }
+}
+
+output agentName string = sreAgent.name
+output agentId string = sreAgent.id
+output identityPrincipalId string = identity.properties.principalId
