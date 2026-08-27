@@ -48,8 +48,9 @@ Docker-in-Docker**.
 - **Observability:** workspace-based Application Insights connected to the Foundry
   project for automatic server-side agent traces, plus correlated backend
   OpenTelemetry spans with content recording disabled.
-- **Gateway:** Azure API Management with GenAI/AI-Gateway policies in front of the
-  model endpoint.
+- **Gateway:** Azure API Management AI Gateway tier (preview), with a native Foundry
+  model provider, structured token policy, runtime key, connector namespace, and
+  OpenTelemetry export.
 - **Operate:** Azure SRE Agent (`Microsoft.App/agents`) provisioned in Bicep, with a
   scoped managed identity, an Action Group, and a metric alert on the backend.
 - **Dev env:** `.devcontainer` with Python 3.12 + **uv**, Node 22 + **npm**, azd,
@@ -60,8 +61,8 @@ Docker-in-Docker**.
 ```
 Frontend Container App (TypeScript SPA)
    └─ HTTP ─▶ Backend Container App (FastAPI)
-                 └─ managed identity ─▶ APIM AI Gateway ─▶ Azure OpenAI model (in Foundry)
                  └─ Responses API ─▶ prompt agent ─▶ Model Router + Foundry IQ KB + operations MCP
+APIM AI Gateway tier ─▶ governed direct model endpoint + model/tool catalog
 Supporting: ACR (remote image builds), Log Analytics + App Insights, Container Apps env, RBAC
 SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Foundry, APIM ─▶ GitHub issues
 ```
@@ -91,13 +92,14 @@ SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Fou
    scope, Log Analytics, App Insights, ACR, Container Apps env, user-assigned MI.
 9. **bicep-foundry** — Azure AI Foundry account/project, model deployment, agent,
    Foundry IQ knowledge resource + sample-doc grounding.
-10. **bicep-apim** — APIM instance + AI-Gateway policies (token limit, load-balance,
-    retries, managed-identity auth) fronting the model endpoint.
+10. **bicep-apim** — native APIM AI Gateway tier + Foundry model registration,
+    structured token limit, runtime key, telemetry exporter, connector namespace,
+    and managed-identity backend auth.
 11. **bicep-containerapp** — **two** Container Apps (backend + frontend) consuming
     ACR images; backend env vars (APIM URL, Foundry IDs) + MI; frontend env var
     (backend URL) + external ingress.
-12. **bicep-rbac** — role assignments: MI → Foundry (Azure AI User), MI → ACR pull,
-    MI → APIM subscription/identity as needed.
+12. **bicep-rbac** — role assignments: app MI → Foundry (Azure AI User), app MI →
+  ACR pull, and AI Gateway system identity → Foundry (Foundry User).
 13. **bicep-sre-agent** — Azure SRE Agent (`Microsoft.App/agents`) + scoped system
   and user-assigned identities (Reader/Monitoring Reader on the RG, Log Analytics
   Reader on the workspace) + Action Group + backend 5xx metric alert.
@@ -121,7 +123,8 @@ SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Fou
   because `GitHub` is not a valid ARM `dataConnectorType`.
 - **Region:** pick one where Foundry Agent Service, APIM, ACA, and SRE Agent all
   exist (e.g. Sweden Central / East US 2) — confirm at build time.
-- **Managed identity everywhere** — no keys in the app; APIM uses MI to the model.
+- **Managed identity upstream** — AI Gateway uses MI to the model provider. Gateway
+  runtime clients use per-application keys passed in the `Api-Key` header.
 - **Foundry IQ / Agent Service Bicep surface is evolving** — if a resource type
   isn't yet GA in Bicep, fall back to an `azd` post-provision hook (az CLI / SDK)
   and document it. Flag this during bicep-foundry.

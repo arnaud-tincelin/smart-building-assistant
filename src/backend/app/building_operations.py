@@ -93,6 +93,81 @@ class BuildingOperations:
             self._state["work_orders"].append(work_order)
             return deepcopy(work_order)
 
+    def request_access(
+        self,
+        building_id: str,
+        access_point_id: str,
+        credential_id: str,
+        method: Literal["badge", "mobile"],
+    ) -> dict:
+        with self._lock:
+            building = self._building(building_id)
+            access_point = self._access_point(building["id"], access_point_id)
+            credential = self._credential(credential_id)
+            if method not in access_point["methods"]:
+                raise ValueError(f"Access point {access_point['id']!r} does not accept {method}.")
+            if credential["method"] != method:
+                raise ValueError("The credential type does not match the access method.")
+            if credential["status"] != "active":
+                raise ValueError("The credential is not active.")
+            if building["id"] not in credential["building_ids"]:
+                raise ValueError("The credential is not authorized for this building.")
+
+            event = {
+                "id": f"SEC-EVT-{len(self._state['security']['audit_events']) + 1:04d}",
+                "operation": "access_request",
+                "building_id": building["id"],
+                "access_point_id": access_point["id"],
+                "credential_id": credential["id"],
+                "method": method,
+                "decision": "granted",
+                "occurred_at": self._now(),
+            }
+            event["outbound_payload"] = self._serialize_security_event(event)
+            self._state["security"]["audit_events"].append(event)
+            return deepcopy(event)
+
+    def check_in_visitor(
+        self,
+        building_id: str,
+        access_point_id: str,
+        visitor_name: str,
+        visitor_email: str,
+        host_name: str,
+        purpose: str,
+    ) -> dict:
+        values = (visitor_name, visitor_email, host_name, purpose)
+        if any(not value.strip() for value in values):
+            raise ValueError("Visitor name, email, host, and purpose are required.")
+
+        with self._lock:
+            building = self._building(building_id)
+            access_point = self._access_point(building["id"], access_point_id)
+            visitor = {
+                "id": f"VIS-{len(self._state['security']['visitors']) + 1:04d}",
+                "building_id": building["id"],
+                "access_point_id": access_point["id"],
+                "visitor_name": visitor_name.strip(),
+                "visitor_email": visitor_email.strip(),
+                "host_name": host_name.strip(),
+                "purpose": purpose.strip(),
+                "status": "checked_in",
+                "checked_in_at": self._now(),
+            }
+            event = {
+                "id": f"SEC-EVT-{len(self._state['security']['audit_events']) + 1:04d}",
+                "operation": "visitor_check_in",
+                "building_id": building["id"],
+                "access_point_id": access_point["id"],
+                "visitor_id": visitor["id"],
+                "decision": "granted",
+                "occurred_at": visitor["checked_in_at"],
+            }
+            event["outbound_payload"] = self._serialize_security_event(event)
+            self._state["security"]["visitors"].append(visitor)
+            self._state["security"]["audit_events"].append(event)
+            return deepcopy(visitor)
+
     def set_hvac_setpoint(
         self,
         building_id: str,
@@ -157,6 +232,32 @@ class BuildingOperations:
             if building["id"] == normalized:
                 return building
         raise ValueError(f"Unknown building_id {building_id!r}.")
+
+    def _access_point(self, building_id: str, access_point_id: str) -> dict:
+        normalized = access_point_id.strip().lower()
+        for access_point in self._state["security"]["access_points"]:
+            if access_point["building_id"] == building_id and access_point["id"] == normalized:
+                return access_point
+        raise ValueError(
+            f"Unknown access_point_id {access_point_id!r} for building {building_id!r}."
+        )
+
+    def _credential(self, credential_id: str) -> dict:
+        normalized = credential_id.strip().upper()
+        for credential in self._state["security"]["credentials"]:
+            if credential["id"] == normalized:
+                return credential
+        raise ValueError(f"Unknown credential_id {credential_id!r}.")
+
+    @staticmethod
+    def _serialize_security_event(event: dict) -> str:
+        return json.dumps(
+            {
+                "eventId": event["id"],
+                "eventType": event["operation"],
+                "occurredAt": event["occurredAt"],
+            }
+        )
 
     @staticmethod
     def _zone(building: dict, zone_id: str) -> dict:

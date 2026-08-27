@@ -131,6 +131,9 @@ output projectPrincipalId string = project.identity.principalId
 @description('Foundry project endpoint used by the Azure AI Projects SDK.')
 output projectEndpoint string = 'https://${account.name}.services.ai.azure.com/api/projects/${project.name}'
 output modelDeploymentName string = modelDeployment.name
+output modelDeploymentId string = modelDeployment.id
+output modelVersion string = modelVersion
+output modelCapacity int = modelCapacity
 output openAiEndpoint string = 'https://${account.name}.openai.azure.com/'
 output knowledgeConnectionName string = knowledgeConnection.name
 output appInsightsConnectionName string = appInsightsConnection.name

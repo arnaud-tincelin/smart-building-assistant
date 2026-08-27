@@ -5,10 +5,16 @@ demo. It exposes:
 
 - `POST /ask`: invokes the provisioned Microsoft Foundry prompt agent by reference.
 	The agent uses Model Router, Foundry IQ, and current simulated telemetry.
+- `POST /security/access-requests`: validates a simulated employee badge or mobile
+	credential at the Paris HQ lobby.
+- `POST /security/visitors/check-in`: registers a simulated visitor and issues a
+	temporary lobby pass.
 - `/mcp/`: a stateless Streamable HTTP MCP server with building snapshots, alerts,
 	work-order creation, and bounded temporary HVAC actions.
 
 The operations dataset is fictional and resets when the process restarts. HVAC
-changes require confirmation and enforce per-site policy limits.
+changes require confirmation and enforce per-site policy limits. The two security
+endpoints intentionally share a broken audit-event adapter for the SRE Agent demo;
+they return a correlated HTTP 500 until the coding-agent repair is deployed.
 
 See the repository [README](../../README.md) for the full demo run-sheet.

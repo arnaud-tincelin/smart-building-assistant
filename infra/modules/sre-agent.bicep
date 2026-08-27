@@ -227,21 +227,21 @@ resource sreAgentAdministratorAssignment 'Microsoft.Authorization/roleAssignment
   }
 }
 
-// Staged-regression lever: a bad model deployment makes the backend return 502s.
-// This alert fires on backend 5xx responses and routes to the SRE Agent.
+// Any backend 5xx, including the access-control demo regression, enters the
+// Azure Monitor incident platform watched by the SRE Agent.
 resource backendErrorAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
   name: alertName
   location: 'global'
   tags: tags
   properties: {
-    description: 'BuildingAssist backend returning 5xx — the staged regression (bad model deployment) is active.'
+    description: 'BuildingAssist backend is returning 5xx responses. Correlate Application Insights failures with connected source code.'
     severity: 2
     enabled: true
     scopes: [
       backendAppId
     ]
     evaluationFrequency: 'PT1M'
-    windowSize: 'PT5M'
+    windowSize: 'PT15M'
     criteria: {
       'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
       allOf: [

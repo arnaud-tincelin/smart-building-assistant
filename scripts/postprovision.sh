@@ -15,9 +15,13 @@ echo "==> Post-provision: Foundry prompt agent setup"
 uv run python "$ROOT/scripts/setup_foundry_agent.py"
 
 echo
+echo "==> Post-provision: SRE Agent incident workflow setup"
+cd "$ROOT"
+python3 "$ROOT/scripts/setup_sre_agent.py"
+
+echo
 echo "Frontend: ${SERVICE_FRONTEND_URL:-<pending>}"
 echo "Backend : ${SERVICE_BACKEND_URL:-<pending>}"
 echo "Foundry : ${AZURE_AI_PROJECT_ENDPOINT:-<pending>}"
 echo
-echo "SRE Agent GitHub connector + incident runbook are configured in the agent"
-echo "Builder (data plane) — see docs/sre-agent.md."
+echo "SRE Agent workflow details: docs/sre-agent.md"

@@ -55,3 +55,53 @@ def test_ask_surfaces_foundry_error(monkeypatch: pytest.MonkeyPatch) -> None:
     resp = TestClient(app).post("/ask", json={"question": "hi"})
     assert resp.status_code == 502
     assert "Foundry is not configured." in resp.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    ("path", "payload", "operation"),
+    [
+        (
+            "/security/access-requests",
+            {
+                "building_id": "paris-hq",
+                "access_point_id": "main-lobby",
+                "credential_id": "BDG-1042",
+                "method": "badge",
+            },
+            "access_request",
+        ),
+        (
+            "/security/visitors/check-in",
+            {
+                "building_id": "paris-hq",
+                "access_point_id": "main-lobby",
+                "visitor_name": "Jordan Lee",
+                "visitor_email": "jordan.lee@example.com",
+                "host_name": "Morgan Chen",
+                "purpose": "Energy audit",
+            },
+            "visitor_check_in",
+        ),
+    ],
+)
+def test_security_demo_operations_surface_diagnosable_server_error(
+    client: TestClient,
+    caplog: pytest.LogCaptureFixture,
+    path: str,
+    payload: dict[str, str],
+    operation: str,
+) -> None:
+    caplog.set_level("ERROR", logger="buildingassist.security")
+
+    response = client.post(path, json=payload)
+
+    assert response.status_code == 500
+    detail = response.json()["detail"]
+    assert detail["code"] == "security_control_failure"
+    assert detail["operation"] == operation
+    assert detail["incident_id"].startswith("SEC-")
+    assert response.headers["x-incident-id"] == detail["incident_id"]
+    assert any(
+        record.operation == operation and record.incident_id == detail["incident_id"]
+        for record in caplog.records
+    )

@@ -19,7 +19,7 @@ Frontend Container App (TypeScript SPA)
             │                    ├─ Foundry IQ Knowledge Base MCP (Azure AI Search)
             │                    └─ Building operations MCP (simulated telemetry)
             └─ /mcp/ ─▶ read tools + approval-gated simulated actions
-Supporting: APIM AI Gateway, ACR, Log Analytics + App Insights traces, Container Apps env, RBAC
+Supporting: APIM AI Gateway tier (preview), ACR, Log Analytics + App Insights traces, Container Apps env, RBAC
 SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Foundry, APIM ─▶ GitHub issues
 ```
 
@@ -89,6 +89,47 @@ the Foundry IQ Knowledge Base, the MCP endpoint, the visible prompt agent, and a
 Application Insights project connection. It also outputs the app, Foundry, Search,
 Application Insights, and APIM resource details.
 
+### AI Gateway tier (preview)
+
+The deployment creates the native APIM **AI Gateway** SKU and its default workspace,
+then registers Model Router as a managed-identity Foundry provider. It also creates a
+gateway runtime key, applies a per-caller token limit, exports token telemetry to the
+existing Application Insights resource, and creates the connector namespace used by
+connector-backed MCP tools. Payload capture remains disabled.
+
+Existing environments get a new `aigw-*` resource alongside the former `apim-*`
+classic service; the preview tier isn't treated as an in-place SKU upgrade. Validate
+the new endpoint first, then delete the old service if nothing else uses it.
+
+The preview currently has no SLA and is limited to **East US 2** and **Sweden
+Central**. Manage additional models, MCP servers, policies, and key rotation in the
+[AI Gateway portal](https://ai.gateway.azure.com). Runtime callers use the
+`Api-Key` header; the gateway separately uses its managed identity and **Foundry
+User** RBAC to call the model deployment.
+
+After provisioning, make a direct Responses API smoke test without writing the key
+to a file or command output:
+
+```bash
+GATEWAY_RESOURCE_ID="$(azd env get-value AI_GATEWAY_RESOURCE_ID)"
+AI_GATEWAY_MODEL_ENDPOINT="$(azd env get-value AI_GATEWAY_MODEL_ENDPOINT)"
+AI_GATEWAY_MODEL="$(azd env get-value AI_GATEWAY_MODEL)"
+AI_GATEWAY_API_KEY="$(az rest --method post \
+  --uri "https://management.azure.com${GATEWAY_RESOURCE_ID}/apiKeys/buildingassist/listSecrets?api-version=2025-09-01-preview" \
+  --query primaryKey --output tsv)"
+
+curl "${AI_GATEWAY_MODEL_ENDPOINT}/responses" \
+  -H "Content-Type: application/json" \
+  -H "Api-Key: ${AI_GATEWAY_API_KEY}" \
+  -d "{\"model\":\"${AI_GATEWAY_MODEL}\",\"input\":\"Summarize today in five words.\"}"
+
+unset AI_GATEWAY_API_KEY
+```
+
+The app's `/ask` path continues to invoke the Foundry prompt agent through its
+project endpoint. AI Gateway model passthrough does not proxy Foundry Agent Service
+`agent_reference` calls; direct model clients use `AI_GATEWAY_MODEL_ENDPOINT`.
+
 The prompt agent is closed-book: every factual response requires an MCP tool call.
 Unsupported or incomplete requests return exactly `i don't know`; model knowledge is
 never used as a fallback. The operations MCP server separates portfolio discovery,
@@ -119,9 +160,10 @@ The full Foundry IQ and MCP walkthrough is in
 ### Attach the Azure SRE Agent (operate pillar)
 
 The SRE Agent (`Microsoft.App/agents`), its scoped identity, an Action Group, and a
-backend 5xx metric alert are **provisioned by Bicep**. After `azd up`, finish the
-data-plane setup (GitHub connector + incident subagent/runbook) and rehearse the
-staged regression: [docs/sre-agent.md](docs/sre-agent.md).
+backend 5xx metric alert are **provisioned by Bicep**. The post-provision hook adds
+the security incident handler, Sev2 response plan, and Code Access when GitHub OAuth
+has been authorized. Rehearse the badge/visitor regression in
+[docs/sre-agent.md](docs/sre-agent.md).
 
 ## Demo run-sheet (maps to the one-hour beats)
 
@@ -130,11 +172,11 @@ staged regression: [docs/sre-agent.md](docs/sre-agent.md).
 | 0:05–0:17 | **Write** | Copilot agent mode builds the `/ask` feature (this repo) | 🟦 Copilot |
 | 0:17–0:31 | **Reason** | Model Router + Foundry IQ retrieval + MCP read/action approval | 🟩 Foundry |
 | 0:31–0:38 | **Operate** | SRE Agent config — resources watched, GitHub link | 🟧 SRE Agent |
-| 0:38–0:48 | **Diagnose** | Trigger the staged regression → SRE Agent RCA → GitHub issue | 🟧 SRE Agent |
+| 0:38–0:48 | **Diagnose** | Badge access returns 500 → SRE Agent RCA → GitHub issue | 🟧 SRE Agent |
 | 0:48–0:57 | **Fix** | Assign issue → Copilot coding agent PR → **review & merge** → redeploy | 🟦 Copilot (HITL) |
 | 0:57–1:00 | **Close** | One platform, governed (APIM AI Gateway + Agent 365) | — |
 
-The staged regression and its revert are in [docs/sre-agent.md](docs/sre-agent.md#5-the-staged-regression-failure-lever).
+The staged regression and repair loop are in [docs/sre-agent.md](docs/sre-agent.md#4-trigger-the-security-regression).
 
 ## Teardown
 
@@ -160,9 +202,10 @@ docs/                      Foundry agent + SRE Agent runbooks
 
 ## Notes
 
-- **Managed identity everywhere** — no keys in the app; the backend authenticates
-  to Foundry IQ, the Foundry project connection authenticates to Azure AI Search,
-  and APIM authenticates to the model.
+- **Managed identity upstream** — the backend authenticates to Foundry, the Foundry
+  project authenticates to Azure AI Search, and AI Gateway authenticates to its
+  model provider with managed identity. Direct gateway clients use a runtime key;
+  its value is never emitted as a Bicep output.
 - **SRE Agent** is provisioned in Bicep (`Microsoft.App/agents`) with a scoped
   identity, Action Group, and backend metric alert; only the GitHub connector and
   incident subagent/runbook are configured post-provision (data plane).

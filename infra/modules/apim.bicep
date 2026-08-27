@@ -1,31 +1,53 @@
 metadata description = '''
-Azure API Management as an AI Gateway in front of the Azure OpenAI (Foundry) model
-endpoint: token rate-limiting, token metrics, retries, and managed-identity auth.
+Azure API Management AI Gateway tier (preview) with a managed-identity Foundry
+provider, Model Router registration, structured token policy, and telemetry.
 '''
 
+@allowed([
+  'eastus2'
+  'swedencentral'
+])
 param location string
 param tags object
 param apimName string
 param publisherEmail string
 param publisherName string
 
-@description('APIM SKU. BasicV2/StandardV2 provision faster than classic Developer.')
-@allowed([
-  'BasicV2'
-  'StandardV2'
-  'Developer'
-])
-param skuName string = 'BasicV2'
+@description('Name of the Foundry account that hosts the model deployment.')
+param foundryAccountName string
 
-@description('Azure OpenAI endpoint to front, e.g. https://<account>.openai.azure.com/')
-param openAiEndpoint string
+@description('Foundry account endpoint used by the AI Gateway model provider.')
+param foundryEndpoint string
 
-resource apim 'Microsoft.ApiManagement/service@2023-05-01-preview' = {
+@description('Resource ID of the Foundry model deployment exposed by the gateway.')
+param modelDeploymentId string
+
+@description('Model deployment name clients send in the model field.')
+param modelDeploymentName string
+
+@description('Version of the model behind the Foundry deployment.')
+param modelVersion string
+
+@minValue(1)
+@description('Per-caller token allowance for the registered model during each minute.')
+param tokenLimitPerMinute int = 30000
+
+@description('Application Insights resource ID used for AI Gateway telemetry.')
+param appInsightsResourceId string
+
+@secure()
+@description('Application Insights connection string used by the telemetry exporter.')
+param appInsightsConnectionString string
+
+var foundryUserRoleId = '53ca6127-db72-4b80-b1b0-d745d6d5456d'
+var normalizedFoundryEndpoint = endsWith(foundryEndpoint, '/') ? foundryEndpoint : '${foundryEndpoint}/'
+
+resource aiGateway 'Microsoft.ApiManagement/service@2025-09-01-preview' = {
   name: apimName
   location: location
   tags: tags
   sku: {
-    name: skuName
+    name: 'AIGateway'
     capacity: 1
   }
   identity: {
@@ -37,42 +59,112 @@ resource apim 'Microsoft.ApiManagement/service@2023-05-01-preview' = {
   }
 }
 
-resource openAiBackend 'Microsoft.ApiManagement/service/backends@2023-05-01-preview' = {
-  parent: apim
-  name: 'azure-openai'
-  properties: {
-    protocol: 'http'
-    url: '${openAiEndpoint}openai'
-  }
-}
-
-resource openAiApi 'Microsoft.ApiManagement/service/apis@2023-05-01-preview' = {
-  parent: apim
-  name: 'azure-openai'
-  properties: {
-    displayName: 'Azure OpenAI (Foundry)'
-    path: 'openai'
-    protocols: [
-      'https'
-    ]
-    subscriptionRequired: true
-    serviceUrl: '${openAiEndpoint}openai'
-    apiType: 'http'
-  }
-}
-
-resource openAiApiPolicy 'Microsoft.ApiManagement/service/apis/policies@2023-05-01-preview' = {
-  parent: openAiApi
-  name: 'policy'
-  properties: {
-    format: 'rawxml'
-    value: loadTextContent('../policies/openai-policy.xml')
-  }
+resource connectorNamespace 'Microsoft.Web/connectorGateways@2026-05-01-preview' = {
+  name: apimName
+  location: location
+  properties: {}
   dependsOn: [
-    openAiBackend
+    aiGateway
   ]
 }
 
-output apimName string = apim.name
-output gatewayUrl string = apim.properties.gatewayUrl
-output apimPrincipalId string = apim.identity.principalId
+resource defaultWorkspace 'Microsoft.ApiManagement/service/workspaces@2025-09-01-preview' existing = {
+  parent: aiGateway
+  name: 'default'
+}
+
+resource foundry 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
+  name: foundryAccountName
+}
+
+resource gatewayFoundryUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(foundry.id, aiGateway.id, foundryUserRoleId)
+  scope: foundry
+  properties: {
+    principalId: aiGateway.identity.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', foundryUserRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource telemetryExporter 'Microsoft.ApiManagement/service/workspaces/telemetryExporters@2025-09-01-preview' = {
+  parent: defaultWorkspace
+  name: 'appinsights'
+  properties: {
+    kind: 'applicationInsights'
+    payloadCapture: false
+    applicationInsights: {
+      connectionString: appInsightsConnectionString
+      resourceId: appInsightsResourceId
+    }
+  }
+}
+
+resource foundryProvider 'Microsoft.ApiManagement/service/workspaces/modelProviders@2025-09-01-preview' = {
+  parent: defaultWorkspace
+  name: 'foundry'
+  dependsOn: [
+    gatewayFoundryUser
+  ]
+  properties: {
+    kind: 'Foundry'
+    displayName: 'Microsoft Foundry'
+    description: 'Managed-identity provider for the BuildingAssist model deployment.'
+    foundry: {
+      endpoint: normalizedFoundryEndpoint
+      resourceIds: [
+        foundry.id
+      ]
+      authentication: {
+        kind: 'ManagedIdentity'
+        managedIdentity: {
+          resource: 'https://cognitiveservices.azure.com/'
+        }
+      }
+    }
+  }
+}
+
+resource model 'Microsoft.ApiManagement/service/workspaces/modelProviders/models@2025-09-01-preview' = {
+  parent: foundryProvider
+  name: modelDeploymentName
+  properties: {
+    description: 'Model Router exposed through the BuildingAssist AI Gateway.'
+    displayName: modelDeploymentName
+    apiFormat: 'OpenAIChatCompletions'
+    supportedEndpoints: [
+      '/openai/v1/chat/completions'
+      '/openai/v1/responses'
+    ]
+    deployment: {
+      resourceId: modelDeploymentId
+      modelName: modelDeploymentName
+      modelVersion: modelVersion
+    }
+    policies: [
+      {
+        type: 'tokenLimit'
+        period: 'minute'
+        count: tokenLimitPerMinute
+        counterKey: 'Identity'
+      }
+    ]
+  }
+}
+
+resource runtimeApiKey 'Microsoft.ApiManagement/service/apiKeys@2025-09-01-preview' = {
+  parent: aiGateway
+  name: 'buildingassist'
+  properties: {
+    displayName: 'BuildingAssist runtime key'
+  }
+}
+
+output apimName string = aiGateway.name
+output apimId string = aiGateway.id
+output gatewayUrl string = aiGateway.properties.gatewayUrl
+output modelEndpoint string = '${aiGateway.properties.gatewayUrl}/default/models/openai/v1'
+output modelName string = model.name
+output runtimeApiKeyId string = runtimeApiKey.id
+output apimPrincipalId string = aiGateway.identity.principalId
+output connectorNamespaceId string = connectorNamespace.id

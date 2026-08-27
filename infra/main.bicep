@@ -40,7 +40,7 @@ var abbrs = {
   appsEnv: 'cae'
   foundry: 'aif'
   search: 'srch'
-  apim: 'apim'
+  apim: 'aigw'
 }
 
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
@@ -121,11 +121,17 @@ module apim 'modules/apim.bicep' = {
     apimName: '${abbrs.apim}-${resourceToken}'
     publisherEmail: apimPublisherEmail
     publisherName: 'Contoso Energy'
-    openAiEndpoint: foundry.outputs.openAiEndpoint
+    foundryAccountName: foundry.outputs.accountName
+    foundryEndpoint: foundry.outputs.accountEndpoint
+    modelDeploymentId: foundry.outputs.modelDeploymentId
+    modelDeploymentName: foundry.outputs.modelDeploymentName
+    modelVersion: foundry.outputs.modelVersion
+    tokenLimitPerMinute: foundry.outputs.modelCapacity * 1000
+    appInsightsResourceId: monitoring.outputs.appInsightsId
+    appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
   }
 }
 
-var modelEndpoint = '${apim.outputs.gatewayUrl}/openai'
 var backendAppName = 'ca-backend-${resourceToken}'
 var backendHost = '${backendAppName}.${appsEnv.outputs.defaultDomain}'
 var backendUrl = 'https://${backendHost}'
@@ -170,10 +176,6 @@ module backend 'modules/container-app.bicep' = {
       {
         name: 'BUILDINGASSIST_AZURE_CLIENT_ID'
         value: identity.outputs.clientId
-      }
-      {
-        name: 'BUILDINGASSIST_MODEL_ENDPOINT'
-        value: modelEndpoint
       }
       {
         name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
@@ -230,7 +232,6 @@ module rbac 'modules/rbac.bicep' = {
     searchServiceName: search.outputs.name
     appInsightsName: monitoring.outputs.appInsightsName
     appPrincipalId: identity.outputs.principalId
-    apimPrincipalId: apim.outputs.apimPrincipalId
     foundryProjectPrincipalId: foundry.outputs.projectPrincipalId
     developerPrincipalId: deployer().objectId
   }
@@ -271,4 +272,9 @@ output BUILDINGASSIST_KNOWLEDGE_CONNECTION string = foundry.outputs.knowledgeCon
 output SERVICE_BACKEND_URL string = backendUrl
 output SERVICE_FRONTEND_URL string = frontend.outputs.appUrl
 output APIM_GATEWAY_URL string = apim.outputs.gatewayUrl
+output AI_GATEWAY_RESOURCE_ID string = apim.outputs.apimId
+output AI_GATEWAY_MODEL_ENDPOINT string = apim.outputs.modelEndpoint
+output AI_GATEWAY_MODEL string = apim.outputs.modelName
+output AI_GATEWAY_API_KEY_RESOURCE_ID string = apim.outputs.runtimeApiKeyId
+output AI_GATEWAY_CONNECTOR_NAMESPACE_RESOURCE_ID string = apim.outputs.connectorNamespaceId
 output SRE_AGENT_NAME string = sreAgent.outputs.agentName

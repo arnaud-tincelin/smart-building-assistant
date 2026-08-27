@@ -69,9 +69,9 @@ Show what a developer's day feels like when the platform has an **agent at every
 
 Keep it **routine, not dramatic** — "the kind of thing that normally eats an afternoon."
 
-- **Trigger:** a recent commit quietly changes a config/timeout on the model calls (or references a wrong/expired model deployment). After deploy, BuildingAssist starts erroring / slowing.
-- **What the SRE Agent does:** detects the regression, correlates it to the recent deploy, reads logs across app + Foundry + APIM, writes a plain-language root cause, and opens a GitHub issue with the diagnosis.
-- **The fix:** the Copilot coding agent adds the timeout/retry (or corrects the config) in a PR.
+- **Trigger:** an employee requests badge/mobile access, or reception checks in a visitor. A shared security audit adapter contract bug returns HTTP 500 with a `SEC-` incident ID.
+- **What the SRE Agent does:** receives the Sev2 Azure Monitor alert, correlates Application Insights and Log Analytics failures with connected source, proves the contract mismatch, and opens one GitHub issue with the diagnosis.
+- **The fix:** the Copilot coding agent aligns the audit timestamp contract and updates the regression tests in a PR. Replaying the same user action returns success.
 - ⚠️ **Rehearse until reproducible**, and record a fallback video — a broken live regression is the #1 demo risk.
 
 ---

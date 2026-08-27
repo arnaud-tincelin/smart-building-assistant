@@ -192,6 +192,34 @@
       }
     }
   ],
+  "security": {
+    "access_points": [
+      {
+        "id": "main-lobby",
+        "building_id": "paris-hq",
+        "name": "Paris HQ main lobby",
+        "methods": ["badge", "mobile"]
+      }
+    ],
+    "credentials": [
+      {
+        "id": "BDG-1042",
+        "holder": "Alex Morgan",
+        "method": "badge",
+        "status": "active",
+        "building_ids": ["paris-hq"]
+      },
+      {
+        "id": "MOB-2048",
+        "holder": "Jamie Rivera",
+        "method": "mobile",
+        "status": "active",
+        "building_ids": ["paris-hq"]
+      }
+    ],
+    "visitors": [],
+    "audit_events": []
+  },
   "work_orders": [],
   "actions": []
 }

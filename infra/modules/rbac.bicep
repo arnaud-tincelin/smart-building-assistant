@@ -8,9 +8,6 @@ param appInsightsName string
 @description('Principal id of the user-assigned managed identity used by the apps.')
 param appPrincipalId string
 
-@description('Principal id of the APIM managed identity (for model-endpoint auth).')
-param apimPrincipalId string
-
 @description('Principal id of the Foundry project system-assigned identity.')
 param foundryProjectPrincipalId string
 
@@ -37,7 +34,6 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
 var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
 var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
 var azureAiUserRoleId = '53ca6127-db72-4b80-b1b0-d745d6d5456d'
-var cognitiveServicesOpenAiUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0'
 var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7'
 var searchIndexDataReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
@@ -73,20 +69,6 @@ resource cognitiveUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   properties: {
     principalId: appPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
-    principalType: 'ServicePrincipal'
-  }
-}
-
-// APIM identity can call the Azure OpenAI model endpoint on the Foundry account.
-resource apimOpenAiUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(foundry.id, apimPrincipalId, cognitiveServicesOpenAiUserRoleId)
-  scope: foundry
-  properties: {
-    principalId: apimPrincipalId
-    roleDefinitionId: subscriptionResourceId(
-      'Microsoft.Authorization/roleDefinitions',
-      cognitiveServicesOpenAiUserRoleId
-    )
     principalType: 'ServicePrincipal'
   }
 }
