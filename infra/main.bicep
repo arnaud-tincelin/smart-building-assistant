@@ -18,6 +18,9 @@ param environmentName string
 @description('Primary region for all resources.')
 param location string
 
+@description('Region for Azure AI Search. Kept separate so capacity constraints do not move the app.')
+param searchLocation string = 'centralus'
+
 @description('Publisher email for APIM.')
 param apimPublisherEmail string = 'demo@contoso-energy.example'
 
@@ -27,6 +30,7 @@ var tags = {
 }
 
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
+var searchToken = toLower(uniqueString(subscription().id, environmentName, searchLocation))
 var abbrs = {
   rg: 'rg'
   logAnalytics: 'log'
@@ -35,6 +39,7 @@ var abbrs = {
   identity: 'id'
   appsEnv: 'cae'
   foundry: 'aif'
+  search: 'srch'
   apim: 'apim'
 }
 
@@ -82,6 +87,18 @@ module appsEnv 'modules/apps-env.bicep' = {
   }
 }
 
+module search 'modules/search.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: searchLocation
+    tags: tags
+    searchName: '${abbrs.search}-${searchToken}'
+  }
+}
+
+var knowledgeBaseName = 'buildingassist-knowledge'
+var knowledgeMcpEndpoint = '${search.outputs.endpoint}/knowledgebases/${knowledgeBaseName}/mcp?api-version=2026-04-01'
+
 module foundry 'modules/foundry.bicep' = {
   scope: resourceGroup
   params: {
@@ -89,6 +106,10 @@ module foundry 'modules/foundry.bicep' = {
     tags: tags
     accountName: '${abbrs.foundry}-${resourceToken}'
     projectName: 'buildingassist'
+    appInsightsResourceId: monitoring.outputs.appInsightsId
+    appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
+    knowledgeMcpEndpoint: knowledgeMcpEndpoint
+    knowledgeConnectionName: knowledgeBaseName
   }
 }
 
@@ -105,13 +126,16 @@ module apim 'modules/apim.bicep' = {
 }
 
 var modelEndpoint = '${apim.outputs.gatewayUrl}/openai'
+var backendAppName = 'ca-backend-${resourceToken}'
+var backendHost = '${backendAppName}.${appsEnv.outputs.defaultDomain}'
+var backendUrl = 'https://${backendHost}'
 
 module backend 'modules/container-app.bicep' = {
   scope: resourceGroup
   params: {
     location: location
     tags: tags
-    appName: 'ca-backend-${resourceToken}'
+    appName: backendAppName
     serviceName: 'backend'
     environmentId: appsEnv.outputs.environmentId
     identityId: identity.outputs.identityId
@@ -128,8 +152,20 @@ module backend 'modules/container-app.bicep' = {
         value: foundry.outputs.modelDeploymentName
       }
       {
-        name: 'BUILDINGASSIST_KNOWLEDGE_NAME'
-        value: 'buildingassist-knowledge'
+        name: 'BUILDINGASSIST_AGENT_NAME'
+        value: 'buildingassist-agent'
+      }
+      {
+        name: 'BUILDINGASSIST_KNOWLEDGE_MCP_ENDPOINT'
+        value: knowledgeMcpEndpoint
+      }
+      {
+        name: 'BUILDINGASSIST_MCP_SERVER_URL'
+        value: '${backendUrl}/mcp/'
+      }
+      {
+        name: 'BUILDINGASSIST_MCP_ALLOWED_HOSTS'
+        value: backendHost
       }
       {
         name: 'BUILDINGASSIST_AZURE_CLIENT_ID'
@@ -142,6 +178,22 @@ module backend 'modules/container-app.bicep' = {
       {
         name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
         value: monitoring.outputs.appInsightsConnectionString
+      }
+      {
+        name: 'BUILDINGASSIST_ENABLE_TRACING'
+        value: 'true'
+      }
+      {
+        name: 'AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING'
+        value: 'true'
+      }
+      {
+        name: 'OTEL_SERVICE_NAME'
+        value: 'buildingassist-backend'
+      }
+      {
+        name: 'OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT'
+        value: 'false'
       }
     ]
   }
@@ -164,7 +216,7 @@ module frontend 'modules/container-app.bicep' = {
     env: [
       {
         name: 'BACKEND_URL'
-        value: backend.outputs.appUrl
+        value: backendUrl
       }
     ]
   }
@@ -175,8 +227,11 @@ module rbac 'modules/rbac.bicep' = {
   params: {
     registryName: registry.outputs.registryName
     foundryAccountName: foundry.outputs.accountName
+    searchServiceName: search.outputs.name
+    appInsightsName: monitoring.outputs.appInsightsName
     appPrincipalId: identity.outputs.principalId
     apimPrincipalId: apim.outputs.apimPrincipalId
+    foundryProjectPrincipalId: foundry.outputs.projectPrincipalId
     developerPrincipalId: deployer().objectId
   }
 }
@@ -190,7 +245,9 @@ module sreAgent 'modules/sre-agent.bicep' = {
     identityName: '${abbrs.identity}-sre-${resourceToken}'
     actionGroupName: 'ag-sre-${resourceToken}'
     alertName: 'alert-backend-5xx-${resourceToken}'
+    developerPrincipalId: deployer().objectId
     appInsightsAppId: monitoring.outputs.appInsightsAppId
+    appInsightsResourceId: monitoring.outputs.appInsightsId
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     logAnalyticsName: monitoring.outputs.logAnalyticsName
     backendAppId: backend.outputs.appId
@@ -202,9 +259,16 @@ output AZURE_RESOURCE_GROUP string = resourceGroup.name
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = registry.outputs.loginServer
 output AZURE_CONTAINER_REGISTRY_NAME string = registry.outputs.registryName
 output AZURE_AI_PROJECT_ENDPOINT string = foundry.outputs.projectEndpoint
+output AZURE_AI_PROJECT_ID string = foundry.outputs.projectId
 output AZURE_AI_ACCOUNT_NAME string = foundry.outputs.accountName
 output AZURE_AI_MODEL_DEPLOYMENT string = foundry.outputs.modelDeploymentName
-output SERVICE_BACKEND_URL string = backend.outputs.appUrl
+output APPLICATIONINSIGHTS_RESOURCE_ID string = monitoring.outputs.appInsightsId
+output APPLICATIONINSIGHTS_NAME string = monitoring.outputs.appInsightsName
+output APPLICATIONINSIGHTS_CONNECTION_NAME string = foundry.outputs.appInsightsConnectionName
+output AZURE_SEARCH_ENDPOINT string = search.outputs.endpoint
+output BUILDINGASSIST_KNOWLEDGE_MCP_ENDPOINT string = knowledgeMcpEndpoint
+output BUILDINGASSIST_KNOWLEDGE_CONNECTION string = foundry.outputs.knowledgeConnectionName
+output SERVICE_BACKEND_URL string = backendUrl
 output SERVICE_FRONTEND_URL string = frontend.outputs.appUrl
 output APIM_GATEWAY_URL string = apim.outputs.gatewayUrl
 output SRE_AGENT_NAME string = sreAgent.outputs.agentName

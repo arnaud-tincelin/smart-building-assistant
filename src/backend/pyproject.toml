@@ -11,6 +11,10 @@ dependencies = [
     "pydantic-settings>=2.5.0",
     "azure-ai-projects>=1.0.0b7",
     "azure-identity>=1.19.0",
+    "mcp>=2.0.0,<3",
+    "azure-search-documents>=12,<13",
+    "azure-monitor-opentelemetry>=1.8.9,<2",
+    "azure-core-tracing-opentelemetry>=1.0.0b13,<2",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +27,11 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[[tool.uv.index]]
+name = "cfs"
+url = "https://packagefeedproxy.microsoft.io/pypi/simple"
+default = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]

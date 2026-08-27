@@ -5,16 +5,20 @@ Bicep** (`Microsoft.App/agents@2026-01-01`). Our infra
 ([infra/modules/sre-agent.bicep](../infra/modules/sre-agent.bicep)) provisions:
 
 - the **SRE Agent** itself (autonomous mode, Anthropic default model);
-- a **user-assigned identity** scoped with **Reader** + **Monitoring Reader** on the
-  resource group and **Log Analytics Reader** on the workspace — so it can list the
-  watched resources (both Container Apps, Foundry, APIM) and run KQL;
+- **SRE Agent Administrator** on the agent for the deployment principal, so the
+  portal and Builder data plane can load;
+- **system-assigned and user-assigned identities**, both scoped with **Reader** +
+  **Monitoring Reader** on the resource group and **Log Analytics Reader** on the
+  workspace — so the current runtime can list watched resources (both Container
+  Apps, Foundry, APIM), use workspace tools, and run KQL;
+- persistent **Application Insights** and **Log Analytics** connectors backed by
+  the system-assigned identity;
 - an **Action Group** as the incident entry point;
 - a **metric alert** on the backend Container App (5xx responses) that fires the
   staged regression into the agent.
 
-So after `azd up` the agent already exists and watches the resource group. Only two
-things remain — both in the **agent Builder (data plane)**, because `GitHub` is not a
-valid ARM `dataConnectorType`:
+So after `azd up` the agent already exists, watches the resource group, and has its
+logs connected. Only two things remain — both in the **agent Builder (data plane)**:
 
 1. the **GitHub connector** (open issues / PRs), and
 2. the **incident-handler subagent + runbook**.
@@ -33,16 +37,14 @@ Or open the agent in the Azure Portal (search for its name) to reach the Builder
 ## 2. Connect GitHub (data plane, in the agent Builder)
 
 1. Open the SRE Agent → **Builder**.
-2. **Code Access** — authorize this repository so the agent can read source for RCA.
+2. **Code Access** — authorize this repository with GitHub OAuth so the agent can
+  read source for RCA. OAuth must be completed once for each newly created agent;
+  it can't be deployed through ARM/Bicep.
 3. **Connectors → GitHub** — authorize the repo with a PAT that has **Issues:
    Read + Write**, so incident diagnoses land as GitHub issues.
 
-Store the values in the azd environment for repeatability:
-
-```bash
-azd env set GITHUB_REPOSITORY "<owner>/<repo>"
-azd env set GITHUB_PAT "<pat-with-issues-rw>"
-```
+Prefer OAuth for interactive setup. For headless automation, pass a PAT only as an
+ephemeral process environment variable; don't persist it in the azd environment.
 
 ## 3. Add the incident-handler subagent + runbook (data plane)
 

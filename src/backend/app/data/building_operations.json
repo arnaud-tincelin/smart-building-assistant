@@ -1,0 +1,197 @@
+{
+  "as_of": "2026-08-27T09:00:00Z",
+  "buildings": [
+    {
+      "id": "paris-hq",
+      "name": "Contoso Energy HQ",
+      "city": "Paris",
+      "timezone": "Europe/Paris",
+      "information": {
+        "gross_floor_area_m2": 18400,
+        "normal_hours": "07:00-20:00 Monday-Friday",
+        "primary_systems": [
+          "variable-air-volume HVAC",
+          "district cooling",
+          "LED lighting",
+          "rooftop solar"
+        ],
+        "metering": "Whole-building electricity plus floor-level HVAC, lighting, and plug-load submeters at 15-minute intervals.",
+        "specificities": [
+          "Floor 3 combines open-plan offices and meeting rooms.",
+          "Floor 3 has the portfolio's highest afternoon cooling sensitivity.",
+          "Floor 3 normally uses 1,050-1,300 kWh per week."
+        ],
+        "sustainability_target": "Reduce peak electrical demand by 12% from the 2025 baseline while maintaining occupied-zone comfort."
+      },
+      "operating_status": "occupied",
+      "telemetry": {
+        "current_power_kw": 184.6,
+        "energy_today_kwh": 1280.4,
+        "energy_this_week_kwh": 6248.9,
+        "occupancy_percent": 74,
+        "indoor_temperature_c": 24.8,
+        "outdoor_temperature_c": 31.0,
+        "hvac_setpoint_c": 23.0,
+        "renewable_share_percent": 38
+      },
+      "zones": [
+        {
+          "id": "floor-3",
+          "name": "Floor 3 offices",
+          "temperature_c": 25.6,
+          "setpoint_c": 23.0,
+          "occupancy_percent": 82
+        },
+        {
+          "id": "floor-5",
+          "name": "Floor 5 collaboration hub",
+          "temperature_c": 24.1,
+          "setpoint_c": 23.0,
+          "occupancy_percent": 67
+        }
+      ],
+      "alerts": [
+        {
+          "id": "ALT-PAR-001",
+          "severity": "warning",
+          "type": "hvac_efficiency",
+          "message": "Floor 3 cooling demand is 18% above its weather-adjusted baseline.",
+          "active": true,
+          "acknowledged": false
+        }
+      ],
+      "action_policy": {
+        "minimum_setpoint_c": 20.0,
+        "maximum_setpoint_c": 26.0,
+        "maximum_duration_minutes": 240,
+        "blocked_hvac_zone_ids": []
+      }
+    },
+    {
+      "id": "seattle-lab",
+      "name": "Contoso Innovation Center",
+      "city": "Seattle",
+      "timezone": "America/Los_Angeles",
+      "information": {
+        "gross_floor_area_m2": 12600,
+        "normal_hours": "Offices 07:00-19:00; prototype lab operates continuously.",
+        "primary_systems": [
+          "air-source heat pumps",
+          "dedicated outside-air system",
+          "lab extraction",
+          "battery storage",
+          "rooftop solar"
+        ],
+        "metering": "Five-minute electrical telemetry for laboratory equipment and 15-minute telemetry for office loads.",
+        "specificities": [
+          "The prototype lab has a high and comparatively inflexible base load.",
+          "Office HVAC and battery charging are the preferred demand-response levers."
+        ],
+        "sustainability_target": "Keep at least 65% of annual electricity matched by renewable generation and shift battery charging outside 16:00-20:00."
+      },
+      "operating_status": "occupied",
+      "telemetry": {
+        "current_power_kw": 262.3,
+        "energy_today_kwh": 1914.7,
+        "energy_this_week_kwh": 9122.5,
+        "occupancy_percent": 61,
+        "indoor_temperature_c": 22.2,
+        "outdoor_temperature_c": 19.0,
+        "hvac_setpoint_c": 22.0,
+        "renewable_share_percent": 71
+      },
+      "zones": [
+        {
+          "id": "prototype-lab",
+          "name": "Prototype lab",
+          "temperature_c": 21.5,
+          "setpoint_c": 21.0,
+          "occupancy_percent": 54
+        },
+        {
+          "id": "office-east",
+          "name": "East office wing",
+          "temperature_c": 22.7,
+          "setpoint_c": 22.0,
+          "occupancy_percent": 66
+        }
+      ],
+      "alerts": [],
+      "action_policy": {
+        "minimum_setpoint_c": 19.0,
+        "maximum_setpoint_c": 25.0,
+        "maximum_duration_minutes": 180,
+        "blocked_hvac_zone_ids": []
+      }
+    },
+    {
+      "id": "munich-ops",
+      "name": "Contoso Operations Campus",
+      "city": "Munich",
+      "timezone": "Europe/Berlin",
+      "information": {
+        "gross_floor_area_m2": 21900,
+        "normal_hours": "Dispatch operates continuously; warehouses run 06:00-18:00.",
+        "primary_systems": [
+          "condensing boilers",
+          "packaged cooling",
+          "destratification fans",
+          "warehouse lighting controls",
+          "electric-vehicle charging"
+        ],
+        "metering": "15-minute electricity and gas readings; warehouse meters can arrive one collection interval late without indicating a fault.",
+        "specificities": [
+          "The dispatch centre is comfort-critical.",
+          "Warehouse temperature and EV charging are flexible.",
+          "Dispatch setpoints must not be used for demand response."
+        ],
+        "sustainability_target": "Reduce combined gas and electricity emissions by 20% from the 2024 baseline."
+      },
+      "operating_status": "reduced-hours",
+      "telemetry": {
+        "current_power_kw": 143.9,
+        "energy_today_kwh": 1008.2,
+        "energy_this_week_kwh": 5377.4,
+        "occupancy_percent": 43,
+        "indoor_temperature_c": 22.9,
+        "outdoor_temperature_c": 27.0,
+        "hvac_setpoint_c": 22.5,
+        "renewable_share_percent": 52
+      },
+      "zones": [
+        {
+          "id": "dispatch",
+          "name": "Dispatch center",
+          "temperature_c": 23.4,
+          "setpoint_c": 22.5,
+          "occupancy_percent": 58
+        },
+        {
+          "id": "warehouse-a",
+          "name": "Warehouse A",
+          "temperature_c": 21.8,
+          "setpoint_c": 21.0,
+          "occupancy_percent": 24
+        }
+      ],
+      "alerts": [
+        {
+          "id": "ALT-MUC-004",
+          "severity": "info",
+          "type": "meter_data_delay",
+          "message": "Warehouse A meter readings are delayed by one collection interval.",
+          "active": true,
+          "acknowledged": true
+        }
+      ],
+      "action_policy": {
+        "minimum_setpoint_c": 18.0,
+        "maximum_setpoint_c": 25.0,
+        "maximum_duration_minutes": 240,
+        "blocked_hvac_zone_ids": ["dispatch"]
+      }
+    }
+  ],
+  "work_orders": [],
+  "actions": []
+}

@@ -1,51 +1,124 @@
-# BuildingAssist — Foundry prompt agent
+# BuildingAssist in Microsoft Foundry
 
-The Foundry **account**, **project**, and **model deployment** are provisioned by
-Bicep (`infra/modules/foundry.bicep`). The **prompt agent** is created
-post-provision from the azd `postprovision` hook, because the agent data plane is
-still evolving in Bicep.
+The root `azd up` creates the Reason portion of the demo end to end:
 
-## What the deployment creates
+- Microsoft Foundry account and project
+- `model-router` version `2025-11-18`, `GlobalStandard`, Balanced mode
+- Azure AI Search Basic with semantic ranking
+- Foundry IQ Knowledge Base named `buildingassist-knowledge`
+- Managed-identity `RemoteTool` connection from the Foundry project to the
+  Knowledge Base MCP endpoint
+- Workspace-based Application Insights and a project-level `AppInsights` connection
+- Prompt agent named `buildingassist-agent`
+- Public building-operations MCP endpoint at the backend's `/mcp/` route
 
-`azd up` runs [`scripts/postprovision.sh`](../scripts/postprovision.sh), which calls
-[`scripts/setup_foundry_agent.py`](../scripts/setup_foundry_agent.py) to create
-(idempotently, by name) a Foundry **prompt agent** — a *prompt agent* is just a model
-deployment + instructions, with no custom container code:
+## Information boundaries
 
-- **Name:** `buildingassist-agent` (override with `BUILDINGASSIST_AGENT_NAME`)
-- **Model:** the deployment Bicep created (`gpt-4.1-mini`, from
-  `AZURE_AI_MODEL_DEPLOYMENT_NAME`)
-- **Instructions:** the BuildingAssist system prompt
+| Need | Source | Examples |
+|---|---|---|
+| Stable facts | Foundry IQ Knowledge Base | buildings, systems, schedules, site constraints, targets, policies |
+| Current state | Operations MCP read tools | power, weekly energy, occupancy, temperatures, active alerts |
+| Operations | Operations MCP action tools | create a work order; apply a temporary HVAC setpoint |
+| Model choice | Model Router | selects an eligible underlying model for each request |
 
-After `azd up` you should see `buildingassist-agent` under **Agents** in your
-Foundry project, and you can test it in the **playground**.
+The four Markdown files in `sample-docs/` are chunked into a semantic Search index.
+`scripts/setup_foundry_iq.py` creates or updates the index, knowledge source, and
+Knowledge Base. `scripts/setup_foundry_agent.py` then creates a new prompt-agent
+version only when its model, instructions, or tools differ.
 
-> **Prompt vs hosted:** the azd AI agents extension (`host: azure.ai.agent`) deploys
-> *hosted* (container/code) agents. A *prompt* agent has no code, so it's created via
-> the Foundry SDK from the post-provision hook rather than by the azd extension.
+The agent is closed-book and has `tool_choice` set to `required`. It can make factual
+claims only from connected MCP tool results in the current conversation. It must not
+use model knowledge or infer missing values. If a source fails, returns no result, or
+does not contain all data needed to answer, the complete response is exactly
+`i don't know`.
 
-## Re-running / updating
+## MCP tools
 
-The setup is idempotent — re-running `azd up` reuses the existing agent and only
-registers a new version when the model or instructions change. To create/update it
-manually against an already-provisioned environment:
+The backend exposes one Streamable HTTP MCP endpoint at `/mcp/`. MCP clients discover
+these separate read operations, which run without approval:
+
+- `list_buildings`: enumerate buildings and their canonical IDs
+- `get_building_information`: retrieve stable metadata, systems, zones, specificities,
+  and operating policy for one building
+- `get_building_data`: retrieve time-stamped telemetry, zone measurements, status,
+  and active alerts for one building
+
+State-changing tools trigger a Foundry MCP approval request:
+
+- `create_work_order`
+- `set_hvac_setpoint`
+
+Everything returned or changed by these tools is fictional, in-memory simulation
+data. HVAC changes also require `confirmed=true` and enforce per-building temperature,
+duration, and blocked-zone policies. Restarting the backend resets all action state.
+
+## Tracing
+
+The Foundry project connection named `buildingassist-observability` enables
+server-side tracing automatically for every prompt-agent invocation. Traces include
+model latency, retrieval, MCP tool calls, failures, and token usage.
+
+The backend configures Azure Monitor OpenTelemetry before creating its Azure AI
+Projects client. W3C trace context propagation correlates the Container App request
+with Foundry's server-side spans. Agent references include both the name and resource
+ID so traces are attributed to `buildingassist-agent`.
+
+Production privacy defaults are explicit:
+
+- prompt, completion, and tool content recording is disabled for client-side spans
+- binary-data tracing is disabled
+- OpenTelemetry baggage propagation is disabled
+- trace-context propagation remains enabled
+
+The Foundry project identity and deployer receive Log Analytics Reader and Privileged
+Monitoring Data Reader on Application Insights. After an invocation, open the Foundry
+project, select **Agents** > **Traces**, and filter by `buildingassist-agent`.
+Ingestion normally takes 2-5 minutes.
+
+## Demo sequence
+
+Open `buildingassist-agent` in the Foundry agent playground.
+
+1. Ask: `Which building is most suitable for demand response, and why?`
+   Show `list_buildings`, `get_building_information`, and grounded citations.
+2. Ask: `What is happening at Paris HQ now, and are there active alerts?`
+   Show the time-stamped `get_building_data` MCP call.
+3. Ask: `Create a high-priority work order to inspect the Floor 3 air handling unit.`
+   Inspect the arguments, approve the MCP action, and show the simulated work-order ID.
+4. Ask: `Temporarily set Paris HQ Floor 3 to 24 C for 60 minutes to reduce peak demand.`
+   Let the agent summarize the change and request confirmation. Confirm, inspect the
+   Foundry approval request, and approve it.
+5. Ask: `Set the Munich dispatch centre to 24 C for demand response.`
+   Show the Knowledge Base policy and MCP enforcement rejecting the comfort-critical zone.
+
+Open the `model-router` deployment under **Models + endpoints** and use its model
+playground for a simple and a complex prompt. Each response identifies the selected
+underlying model. In Azure Monitor, filter to the deployment and split metrics by
+underlying model to show routing distribution.
+
+## Manual refresh
+
+The `postprovision` hook normally performs all setup. To refresh the data-plane
+objects against the selected root azd environment:
 
 ```bash
-AZURE_AI_PROJECT_ENDPOINT="$(azd env get-value AZURE_AI_PROJECT_ENDPOINT)" \
-AZURE_AI_MODEL_DEPLOYMENT_NAME="$(azd env get-value AZURE_AI_MODEL_DEPLOYMENT_NAME)" \
-  sh -c 'cd src/backend && uv run python ../../scripts/setup_foundry_agent.py'
+cd src/backend
+uv run python ../../scripts/setup_foundry_iq.py
+uv run python ../../scripts/setup_foundry_agent.py
 ```
 
-## Step 2 — Foundry IQ grounding (later)
+These commands rely on the environment values emitted by `azd provision`. Run them
+through the `postprovision` hook or export the corresponding `azd env get-values`
+values first.
 
-Grounding the agent on the sample building/energy docs is the next step. It adds a
-`file_search` tool over a vector store built from [`sample-docs/`](../sample-docs) by
-[`scripts/setup_foundry_knowledge.py`](../scripts/setup_foundry_knowledge.py), then
-attaches that tool to the prompt agent's definition so answers carry citations.
+Role assignments can take several minutes to propagate after the first provision.
+If Knowledge Base setup returns `403`, wait for propagation and rerun `azd provision`;
+the setup scripts and Bicep resources are idempotent.
 
-## Notes
+## Production boundary
 
-- The backend authenticates with the user-assigned managed identity
-  (`DefaultAzureCredential`) — no keys. RBAC (Azure AI User) is granted by
-  `infra/modules/rbac.bicep`.
-- SDK/CLI reference: [Azure AI Projects SDK docs](https://learn.microsoft.com/azure/ai-foundry/).
+The operations MCP endpoint is intentionally unauthenticated because it contains
+only disposable fictional data. Before connecting real building-management systems,
+put MCP behind authenticated APIM, persist state and audit events, apply role-based
+authorization per tool and site, retain approval for every control action, and add
+idempotency keys plus rollback workflows.

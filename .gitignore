@@ -27,3 +27,6 @@ build/
 *:Zone.Identifier
 .vscode/*
 !.vscode/extensions.json
+
+# Specific skill to work with Microsoft Security Policy
+.github/skills/cfs-package-feeds/

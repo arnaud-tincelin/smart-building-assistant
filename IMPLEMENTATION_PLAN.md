@@ -43,9 +43,11 @@ Docker-in-Docker**.
 - **IaC:** Azure Developer CLI (`azd`) + Bicep modules.
 - **Hosting:** two **Azure Container Apps** (backend + frontend). Images built by
   **ACR remote build** through `azd` — no local Docker daemon.
-- **AI:** Azure AI Foundry project + model deployment; Foundry IQ (knowledge/RAG)
-  grounded on sample docs. The **Foundry agent** is a hosted agent created with the
-  **azd AI agent extension** (`agent/`, host `azure.ai.agent`, Responses protocol).
+- **AI:** Microsoft Foundry project + Model Router; a Foundry IQ Knowledge Base on
+  Azure AI Search; a prompt agent with simulated operations through MCP.
+- **Observability:** workspace-based Application Insights connected to the Foundry
+  project for automatic server-side agent traces, plus correlated backend
+  OpenTelemetry spans with content recording disabled.
 - **Gateway:** Azure API Management with GenAI/AI-Gateway policies in front of the
   model endpoint.
 - **Operate:** Azure SRE Agent (`Microsoft.App/agents`) provisioned in Bicep, with a
@@ -59,7 +61,7 @@ Docker-in-Docker**.
 Frontend Container App (TypeScript SPA)
    └─ HTTP ─▶ Backend Container App (FastAPI)
                  └─ managed identity ─▶ APIM AI Gateway ─▶ Azure OpenAI model (in Foundry)
-                 └─ Azure AI Projects SDK ─▶ Foundry Agent ─▶ Foundry IQ knowledge (sample docs)
+                 └─ Responses API ─▶ prompt agent ─▶ Model Router + Foundry IQ KB + operations MCP
 Supporting: ACR (remote image builds), Log Analytics + App Insights, Container Apps env, RBAC
 SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Foundry, APIM ─▶ GitHub issues
 ```
@@ -96,9 +98,9 @@ SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Fou
     (backend URL) + external ingress.
 12. **bicep-rbac** — role assignments: MI → Foundry (Azure AI User), MI → ACR pull,
     MI → APIM subscription/identity as needed.
-13. **bicep-sre-agent** — Azure SRE Agent (`Microsoft.App/agents`) + scoped
-    user-assigned identity (Reader/Monitoring Reader on the RG, Log Analytics
-    Reader on the workspace) + Action Group + backend 5xx metric alert.
+13. **bicep-sre-agent** — Azure SRE Agent (`Microsoft.App/agents`) + scoped system
+  and user-assigned identities (Reader/Monitoring Reader on the RG, Log Analytics
+  Reader on the workspace) + Action Group + backend 5xx metric alert.
 14. **sre-agent-doc** — `docs/` runbook: the agent is provisioned by Bicep; document
     the post-provision data-plane steps (GitHub connector, incident subagent/runbook)
     and the staged regression + revert.
@@ -109,14 +111,9 @@ SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Fou
 
 ## Notes & considerations
 
-- **Foundry agent via azd AI agent extension:** the agent is a Foundry **hosted
-  agent** scaffolded/deployed with `azd ai agent` (`agent/` subproject, `infra:
-  microsoft.foundry`). It provisions its own Foundry account + capability host, so
-  it's a separate azd project from the bicep-based app. Its runtime managed identity
-  needs the **Foundry User** role on the project to read the Foundry IQ knowledge.
-- **Foundry IQ knowledge** is provisioned idempotently by the `postprovision` hook
-  ([scripts/setup_foundry_knowledge.py]) as a vector store; both the backend app and
-  the hosted agent ground on it via the Responses `file_search` tool.
+- **Foundry IQ knowledge** is provisioned idempotently by `setup_foundry_iq.py` as
+  an Azure AI Search index, knowledge source, and GA Knowledge Base. The root app and
+  prompt agent consume its authenticated MCP endpoint.
 - **SRE Agent is first-class in Bicep** (`Microsoft.App/agents`, API `2026-01-01`) —
   provisioned by our infra with its own scoped identity, an Action Group, and a
   backend metric alert. Only the GitHub issue connector and the incident

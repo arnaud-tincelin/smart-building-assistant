@@ -2,9 +2,9 @@
 
 Environment for the 60-minute demo **"A Developer's Day on the Microsoft Agentic
 Platform"** (customer: *Contoso Energy*). The app is a deliberately thin **Smart
-Building assistant**: a user asks *"How much energy did Floor 3 use this week?"* and
-an **Azure AI Foundry agent** answers, grounded via **Foundry IQ**. The platform is
-the star — the agents at each lifecycle stage act *around* this app.
+Building assistant**: a user can ask what is special about a site, inspect simulated
+current conditions, and request a bounded operation. A **Microsoft Foundry agent**
+combines **Model Router**, a **Foundry IQ Knowledge Base**, and **MCP** tools.
 
 > Full demo narrative and run-sheet: [.github/instructions.md](.github/instructions.md).
 > Build plan: [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
@@ -14,9 +14,12 @@ the star — the agents at each lifecycle stage act *around* this app.
 ```
 Frontend Container App (TypeScript SPA)
    └─ HTTP ─▶ Backend Container App (FastAPI)
-                 └─ managed identity ─▶ APIM AI Gateway ─▶ Azure OpenAI model (in Foundry)
-                 └─ Azure AI Projects SDK ─▶ Foundry Agent ─▶ Foundry IQ knowledge (sample docs)
-Supporting: ACR (remote image builds), Log Analytics + App Insights, Container Apps env, RBAC
+            ├─ Responses API ─▶ BuildingAssist prompt agent
+            │                    ├─ Model Router (Balanced)
+            │                    ├─ Foundry IQ Knowledge Base MCP (Azure AI Search)
+            │                    └─ Building operations MCP (simulated telemetry)
+            └─ /mcp/ ─▶ read tools + approval-gated simulated actions
+Supporting: APIM AI Gateway, ACR, Log Analytics + App Insights traces, Container Apps env, RBAC
 SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Foundry, APIM ─▶ GitHub issues
 ```
 
@@ -27,6 +30,11 @@ SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Fou
   is injected at container start (runtime `config.js`). See [src/frontend](src/frontend).
 - **Infra** — `azd` + Bicep. Two Azure Container Apps; images built **remotely by
   ACR** (no local Docker). See [infra](infra).
+- **Knowledge** — Azure AI Search Basic hosts the GA Foundry IQ Knowledge Base;
+  four Markdown sources are chunked and indexed idempotently after provision.
+- **Tracing** — the Foundry project is connected to workspace-based Application
+  Insights for automatic prompt-agent traces. The backend adds correlated
+  OpenTelemetry spans with prompt and tool content recording disabled.
 
 ## Prerequisites
 
@@ -45,7 +53,7 @@ cd src/backend
 cp .env.example .env          # BUILDINGASSIST_USE_MOCK_AGENT=true by default
 uv sync
 uv run uvicorn app.main:app --reload --port 8000
-# → http://localhost:8000/healthz  and  POST /ask
+# → http://localhost:8000/healthz, POST /ask, and MCP at /mcp/
 ```
 
 Frontend (Vite dev server; proxies /api to the backend on :8000):
@@ -76,30 +84,37 @@ azd env set AZURE_LOCATION swedencentral
 azd up                                # provision infra + build (ACR) + deploy both apps
 ```
 
-`azd up` outputs the backend/frontend URLs, the Foundry project endpoint, and the
-APIM gateway URL. The frontend container reads the backend URL at start via the
-`BACKEND_URL` env var (rendered into `config.js`).
+`azd up` provisions Model Router `2025-11-18` in Balanced mode, Azure AI Search,
+the Foundry IQ Knowledge Base, the MCP endpoint, the visible prompt agent, and an
+Application Insights project connection. It also outputs the app, Foundry, Search,
+Application Insights, and APIM resource details.
 
-### Create the Foundry agent (azd AI agent extension)
+The prompt agent is closed-book: every factual response requires an MCP tool call.
+Unsupported or incomplete requests return exactly `i don't know`; model knowledge is
+never used as a fallback. The operations MCP server separates portfolio discovery,
+building information, and current building data into distinct tools.
 
-The demo's **Foundry agent** is a hosted agent created and deployed with the
-[azd AI agent extension](https://learn.microsoft.com/azure/developer/azure-developer-cli/extensions/azure-ai-foundry-extension).
-It lives in its own self-contained azd project under [agent/](agent) (host
-`azure.ai.agent`, `infra: microsoft.foundry`) and is grounded on the Foundry IQ
-knowledge via Responses `file_search`:
+### Reason demo
 
-```bash
-cd agent
-azd env new agent-dev --subscription <sub> --location eastus2
-azd up
-azd ai agent invoke buildingassist-agent "How much energy did Floor 3 use this week?"
-```
+Open `buildingassist-agent` in the Foundry playground and run this sequence:
 
-See [agent/README.md](agent/README.md) for the one-time grounding RBAC step. The
-backend app can also answer directly from the Foundry project's model + Foundry IQ
-knowledge (Responses API) — the knowledge vector store is provisioned by the
-`postprovision` hook ([scripts/setup_foundry_knowledge.py](scripts/setup_foundry_knowledge.py)),
-and a portal/CLI walkthrough is in [docs/foundry-agent.md](docs/foundry-agent.md).
+1. `Why is Paris HQ Floor 3 more sensitive to warm afternoons than our other sites?`
+2. `What is happening there now, and are there active alerts?`
+3. `Create a high-priority work order to inspect the Floor 3 air handling unit.`
+4. `Temporarily set Floor 3 to 24 C for 60 minutes to reduce peak demand.`
+
+The first answer comes from Foundry IQ, the second uses read-only operations MCP
+tools, and the last two exercise state-changing tools. Foundry requires approval
+for non-read-only MCP calls; the HVAC simulator also requires explicit confirmation
+and enforces site-specific temperature, duration, and zone policies. All operational
+data and actions are clearly marked as fictional simulation data.
+
+Open the `model-router` deployment's model playground to show the underlying model
+selected for each response. Azure Monitor can split the deployment's metrics by
+underlying model.
+
+The full Foundry IQ and MCP walkthrough is in
+[docs/foundry-agent.md](docs/foundry-agent.md).
 
 ### Attach the Azure SRE Agent (operate pillar)
 
@@ -113,7 +128,7 @@ staged regression: [docs/sre-agent.md](docs/sre-agent.md).
 | Time | Beat | What to show | Pillar |
 |---|---|---|---|
 | 0:05–0:17 | **Write** | Copilot agent mode builds the `/ask` feature (this repo) | 🟦 Copilot |
-| 0:17–0:31 | **Reason** | The Foundry agent + playground; grounded answer with citations | 🟩 Foundry |
+| 0:17–0:31 | **Reason** | Model Router + Foundry IQ retrieval + MCP read/action approval | 🟩 Foundry |
 | 0:31–0:38 | **Operate** | SRE Agent config — resources watched, GitHub link | 🟧 SRE Agent |
 | 0:38–0:48 | **Diagnose** | Trigger the staged regression → SRE Agent RCA → GitHub issue | 🟧 SRE Agent |
 | 0:48–0:57 | **Fix** | Assign issue → Copilot coding agent PR → **review & merge** → redeploy | 🟦 Copilot (HITL) |
@@ -134,9 +149,8 @@ Delete the SRE Agent separately (it's provisioned outside this repo's Bicep).
 ```
 azure.yaml                 azd project (two ACA services, ACR remote build)
 infra/                     Bicep: main + modules (monitoring, registry, identity,
-                           apps-env, foundry, apim, container-app, rbac, sre-agent)
-agent/                     Foundry hosted agent (azd AI agent extension)
-scripts/                   postprovision hook + Foundry IQ knowledge setup
+                           apps-env, foundry, search, apim, container-app, rbac, sre-agent)
+scripts/                   postprovision hook + Foundry IQ / prompt-agent setup
 src/backend/               FastAPI service (uv)
 src/frontend/              Vite + React SPA (TypeScript, npm via Azure Artifacts)
 sample-docs/               Sample building/energy docs for Foundry IQ grounding
@@ -146,8 +160,9 @@ docs/                      Foundry agent + SRE Agent runbooks
 
 ## Notes
 
-- **Managed identity everywhere** — no keys in the app; APIM authenticates to the
-  model with its own managed identity.
+- **Managed identity everywhere** — no keys in the app; the backend authenticates
+  to Foundry IQ, the Foundry project connection authenticates to Azure AI Search,
+  and APIM authenticates to the model.
 - **SRE Agent** is provisioned in Bicep (`Microsoft.App/agents`) with a scoped
   identity, Action Group, and backend metric alert; only the GitHub connector and
   incident subagent/runbook are configured post-provision (data plane).

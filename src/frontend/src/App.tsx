@@ -1,7 +1,8 @@
 import { FormEvent, useState } from "react";
 import { ask, type AskResponse } from "./api";
 
-const SAMPLE_QUESTION = "How much energy did Floor 3 use this week?";
+const SAMPLE_QUESTION =
+  "Why is Paris HQ Floor 3 energy-sensitive, and what is happening there now?";
 
 export function App() {
   const [question, setQuestion] = useState(SAMPLE_QUESTION);
@@ -36,7 +37,7 @@ export function App() {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder={SAMPLE_QUESTION}
-          aria-label="Energy question"
+          aria-label="Building question"
         />
         <button type="submit" disabled={loading || question.trim().length === 0}>
           {loading ? "Asking…" : "Ask"}

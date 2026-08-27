@@ -1,11 +1,8 @@
-"""Post-provision setup for the BuildingAssist Foundry **prompt agent**.
+"""Post-provision setup for the BuildingAssist Foundry prompt agent.
 
-Runs from the azd `postprovision` hook. Creates (idempotently, by name) a Foundry
-**prompt agent** — a model deployment + instructions — so it shows up in the
-project's **Agents** list and can be exercised from the playground or the backend.
-
-This is **step 1**: a plain agent with no tools. Foundry IQ grounding (a
-``file_search`` tool over the sample-doc vector store) is added in step 2.
+Runs from the azd ``postprovision`` hook after knowledge sync. Creates or updates
+the visible prompt agent with Model Router, Foundry IQ, and the
+simulated building-operations MCP tools.
 
 Auth uses ``DefaultAzureCredential`` — locally this resolves to the azd/az login,
 and the developer principal is granted ``Azure AI User`` on the Foundry account by
@@ -18,7 +15,9 @@ Optional:
 - ``BUILDINGASSIST_AGENT_NAME`` — agent name (default ``buildingassist-agent``).
 - ``AZURE_AI_MODEL_DEPLOYMENT_NAME`` / ``AZURE_AI_MODEL_DEPLOYMENT`` /
   ``BUILDINGASSIST_MODEL_DEPLOYMENT`` — the model deployment the agent reasons with
-  (default ``gpt-4.1-mini``).
+    (default ``model-router``).
+- ``BUILDINGASSIST_MCP_SERVER_URL`` — public Streamable HTTP MCP endpoint; defaults
+    to ``SERVICE_BACKEND_URL`` + ``/mcp/`` when available.
 """
 
 from __future__ import annotations
@@ -27,23 +26,38 @@ import os
 import sys
 
 from azure.ai.projects import AIProjectClient
-from azure.ai.projects.models import PromptAgentDefinition
+from azure.ai.projects.models import (
+    MCPTool,
+    MCPToolFilter,
+    MCPToolRequireApproval,
+    PromptAgentDefinition,
+)
 from azure.core.exceptions import ResourceNotFoundError
 from azure.identity import DefaultAzureCredential
+
+from app.agent_policy import (
+    ACTION_MCP_TOOLS,
+    AGENT_INSTRUCTIONS,
+    READ_ONLY_MCP_TOOLS,
+)
 
 AGENT_NAME = os.environ.get("BUILDINGASSIST_AGENT_NAME", "buildingassist-agent")
 MODEL_DEPLOYMENT = (
     os.environ.get("AZURE_AI_MODEL_DEPLOYMENT_NAME")
     or os.environ.get("AZURE_AI_MODEL_DEPLOYMENT")
     or os.environ.get("BUILDINGASSIST_MODEL_DEPLOYMENT")
-    or "gpt-4.1-mini"
+    or "model-router"
 )
-
-INSTRUCTIONS = (
-    "You are BuildingAssist, an assistant for Contoso Energy's smart buildings. "
-    "Answer questions about building energy use concisely and factually. If you "
-    "don't have the data, say so plainly."
+MCP_SERVER_URL = (
+    f"{os.environ['SERVICE_BACKEND_URL'].rstrip('/')}/mcp/"
+    if os.environ.get("SERVICE_BACKEND_URL")
+    else os.environ.get("BUILDINGASSIST_MCP_SERVER_URL", "")
 )
+KNOWLEDGE_MCP_ENDPOINT = os.environ.get("BUILDINGASSIST_KNOWLEDGE_MCP_ENDPOINT", "")
+KNOWLEDGE_CONNECTION = os.environ.get(
+    "BUILDINGASSIST_KNOWLEDGE_CONNECTION", "buildingassist-knowledge"
+)
+MCP_TOOLS = READ_ONLY_MCP_TOOLS + ACTION_MCP_TOOLS
 
 
 def _latest_definition(client: AIProjectClient) -> dict | None:
@@ -63,16 +77,57 @@ def _latest_definition(client: AIProjectClient) -> dict | None:
     return definition.as_dict() if hasattr(definition, "as_dict") else dict(definition)
 
 
+def _build_tools() -> list:
+    tools = []
+    if KNOWLEDGE_MCP_ENDPOINT:
+        tools.append(
+            MCPTool(
+                server_label="building_knowledge",
+                server_description="Foundry IQ Knowledge Base for stable Contoso building facts.",
+                server_url=KNOWLEDGE_MCP_ENDPOINT,
+                allowed_tools=["knowledge_base_retrieve"],
+                require_approval="never",
+                project_connection_id=KNOWLEDGE_CONNECTION,
+            )
+        )
+    else:
+        print("No Foundry IQ Knowledge Base endpoint found; agent will be ungrounded.")
+
+    if MCP_SERVER_URL:
+        tools.append(
+            MCPTool(
+                server_label="building_operations",
+                server_description=(
+                    "Fictional current telemetry, alerts, and bounded actions "
+                    "for Contoso buildings."
+                ),
+                server_url=MCP_SERVER_URL,
+                allowed_tools=MCP_TOOLS,
+                require_approval=MCPToolRequireApproval(
+                    always=MCPToolFilter(tool_names=ACTION_MCP_TOOLS),
+                    never=MCPToolFilter(tool_names=READ_ONLY_MCP_TOOLS),
+                ),
+            )
+        )
+    else:
+        print("No MCP server URL found; agent will not have live operations tools.")
+    return tools
+
+
 def _ensure_agent(client: AIProjectClient) -> None:
     """Create the prompt agent, or add a version only when the definition changed."""
-    desired = PromptAgentDefinition(model=MODEL_DEPLOYMENT, instructions=INSTRUCTIONS)
+    desired = PromptAgentDefinition(
+        model=MODEL_DEPLOYMENT,
+        instructions=AGENT_INSTRUCTIONS,
+        tools=_build_tools(),
+        tool_choice="required",
+    )
     current = _latest_definition(client)
 
     if current is not None:
         want = desired.as_dict()
-        if current.get("model") == want.get("model") and current.get(
-            "instructions"
-        ) == want.get("instructions"):
+        comparable_fields = ("model", "instructions", "tools", "tool_choice")
+        if all(current.get(field) == want.get(field) for field in comparable_fields):
             print(f"Reusing prompt agent {AGENT_NAME!r} (unchanged).")
             return
         print(f"Updating prompt agent {AGENT_NAME!r} (definition changed).")
@@ -82,7 +137,7 @@ def _ensure_agent(client: AIProjectClient) -> None:
     version = client.agents.create_version(
         agent_name=AGENT_NAME,
         definition=desired,
-        description="Contoso Energy smart-building assistant (BuildingAssist).",
+        description="Grounded smart-building assistant with simulated MCP operations.",
     )
     print(f"Registered {AGENT_NAME!r} version {getattr(version, 'version', '?')}.")
 

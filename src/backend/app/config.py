@@ -9,12 +9,7 @@ from __future__ import annotations
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEFAULT_INSTRUCTIONS = (
-    "You are BuildingAssist, an assistant for Contoso Energy's smart buildings. "
-    "Answer questions about building energy use concisely and factually. When a "
-    "knowledge source is available, ground your answer in it and cite the source. "
-    "If you don't have the data, say so plainly."
-)
+from .agent_policy import AGENT_INSTRUCTIONS
 
 
 class Settings(BaseSettings):
@@ -32,20 +27,33 @@ class Settings(BaseSettings):
     project_endpoint: str = ""
 
     # The model deployment the agent reasons with.
-    model_deployment: str = "gpt-4.1-mini"
+    model_deployment: str = "model-router"
 
-    # Name of the Foundry IQ knowledge (vector store) to ground answers on. The
-    # backend resolves it to an id at runtime, so no id needs to be wired in.
-    knowledge_name: str = "buildingassist-knowledge"
+    # Prompt agent created by the postprovision hook. Empty uses direct Responses tools.
+    agent_name: str = "buildingassist-agent"
+
+    # Authenticated Azure AI Search Knowledge Base MCP endpoint (Foundry IQ).
+    knowledge_mcp_endpoint: str = ""
+
+    # Public Streamable HTTP endpoint for the simulated building-operations MCP server.
+    mcp_server_url: str = ""
 
     # System instructions for the agent.
-    instructions: str = DEFAULT_INSTRUCTIONS
+    instructions: str = AGENT_INSTRUCTIONS
+
+    # Client-side OpenTelemetry; server-side agent tracing is controlled by the
+    # Foundry project's Application Insights connection.
+    enable_tracing: bool = False
 
     # Managed identity client id (user-assigned). Empty => system-assigned / default.
     azure_client_id: str = ""
 
     # CORS: comma-separated list of allowed frontend origins. "*" allows all.
     allowed_origins: str = "*"
+
+    # Hosts and browser origins accepted by the public MCP Streamable HTTP endpoint.
+    mcp_allowed_hosts: str = "localhost,localhost:*,127.0.0.1,127.0.0.1:*,testserver"
+    mcp_allowed_origins: str = "http://localhost:*,http://127.0.0.1:*"
 
     # When true, skip the real Foundry call and return a canned answer. Handy for
     # local development and tests without Azure credentials.
@@ -58,6 +66,18 @@ class Settings(BaseSettings):
         if raw == "*" or not raw:
             return ["*"]
         return [o.strip() for o in raw.split(",") if o.strip()]
+
+    @property
+    def mcp_allowed_hosts_list(self) -> list[str]:
+        return [host.strip() for host in self.mcp_allowed_hosts.split(",") if host.strip()]
+
+    @property
+    def mcp_allowed_origins_list(self) -> list[str]:
+        return [
+            origin.strip()
+            for origin in self.mcp_allowed_origins.split(",")
+            if origin.strip()
+        ]
 
 
 settings = Settings()

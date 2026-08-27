@@ -24,11 +24,11 @@ services:
                     shell: sh
                     run: npm ci && npm run build
 infra:
-    provider: microsoft.foundry
+    provider: bicep
     module: main
 hooks:
     postprovision:
         posix:
             shell: sh
             run: sh ./scripts/postprovision.sh
-            continueOnError: true
+            continueOnError: false

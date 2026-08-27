@@ -1,10 +1,9 @@
 """Azure AI Foundry client.
 
 The agent the app calls is the combination of a **model deployment**, its
-**instructions**, and a **Foundry IQ knowledge** source (a vector store of the
-sample building/energy docs). We talk to it through the Foundry project's
-OpenAI-compatible **Responses API** with the ``file_search`` tool, which returns a
-grounded answer plus file citations.
+**instructions**, a **Foundry IQ knowledge** source, and live-like data exposed by
+the simulated building-operations **MCP** server. We call it through the Foundry
+project's OpenAI-compatible **Responses API**.
 
 Authentication uses ``DefaultAzureCredential`` so the same code works locally
 (developer login / ``azd``) and in Azure (user-assigned managed identity).
@@ -15,9 +14,10 @@ from __future__ import annotations
 import logging
 from functools import lru_cache
 
-from azure.identity import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 from .config import settings
+from .mcp_server import READ_ONLY_TOOLS
 from .models import Citation
 
 logger = logging.getLogger("buildingassist.foundry")
@@ -39,44 +39,55 @@ class FoundryAgentClient:
     """Small facade over the Foundry project's Responses API."""
 
     def __init__(self) -> None:
+        self._project_client = None
         self._openai_client = None
-        self._vector_store_id: str | None = None
-        self._resolved = False
+        self._credential = None
+        self._search_token_provider = None
+        self._agent_id: str | None = None
+
+    def _default_credential(self):
+        if self._credential is None:
+            credential_kwargs = {}
+            if settings.azure_client_id:
+                credential_kwargs["managed_identity_client_id"] = settings.azure_client_id
+            self._credential = DefaultAzureCredential(**credential_kwargs)
+        return self._credential
+
+    def _project(self):
+        """Lazily construct the Foundry project client."""
+        if self._project_client is not None:
+            return self._project_client
+        from azure.ai.projects import AIProjectClient
+
+        self._project_client = AIProjectClient(
+            endpoint=settings.project_endpoint, credential=self._default_credential()
+        )
+        return self._project_client
 
     def _client(self):
         """Lazily construct the OpenAI-compatible client (needs network + creds)."""
         if self._openai_client is not None:
             return self._openai_client
 
-        from azure.ai.projects import AIProjectClient
-
-        credential_kwargs = {}
-        if settings.azure_client_id:
-            credential_kwargs["managed_identity_client_id"] = settings.azure_client_id
-
-        credential = DefaultAzureCredential(**credential_kwargs)
-        project = AIProjectClient(
-            endpoint=settings.project_endpoint, credential=credential
-        )
-        self._openai_client = project.get_openai_client()
+        self._openai_client = self._project().get_openai_client()
         return self._openai_client
 
-    def _vector_store(self, oai) -> str | None:
-        """Resolve the Foundry IQ knowledge vector store id by name (cached)."""
-        if self._resolved:
-            return self._vector_store_id
+    def _agent_reference(self) -> dict[str, str]:
+        if self._agent_id is None:
+            agent = self._project().agents.get(settings.agent_name)
+            self._agent_id = agent.id
+        return {
+            "name": settings.agent_name,
+            "id": self._agent_id,
+            "type": "agent_reference",
+        }
 
-        self._resolved = True
-        try:
-            for store in oai.vector_stores.list():
-                if getattr(store, "name", None) == settings.knowledge_name:
-                    self._vector_store_id = store.id
-                    break
-        except Exception:  # noqa: BLE001 - grounding is best-effort
-            logger.warning("Could not list vector stores; continuing without grounding.")
-        if self._vector_store_id is None:
-            logger.info("No knowledge vector store %r found.", settings.knowledge_name)
-        return self._vector_store_id
+    def _search_token(self) -> str:
+        if self._search_token_provider is None:
+            self._search_token_provider = get_bearer_token_provider(
+                self._default_credential(), "https://search.azure.com/.default"
+            )
+        return self._search_token_provider()
 
     def ask(self, question: str) -> tuple[str, list[Citation]]:
         """Ask the Foundry agent a question and return (answer, citations)."""
@@ -91,19 +102,51 @@ class FoundryAgentClient:
             )
 
         oai = self._client()
-        vector_store_id = self._vector_store(oai)
+        if settings.agent_name:
+            kwargs = {
+                "input": question,
+                "extra_body": {
+                    "agent_reference": self._agent_reference(),
+                },
+            }
+            return self._create_response(oai, kwargs)
 
         kwargs: dict = {
             "model": settings.model_deployment,
             "instructions": settings.instructions,
             "input": question,
         }
-        if vector_store_id:
-            kwargs["tools"] = [
-                {"type": "file_search", "vector_store_ids": [vector_store_id]}
-            ]
-            kwargs["include"] = ["file_search_call.results"]
+        if settings.knowledge_mcp_endpoint:
+            kwargs.setdefault("tools", []).append(
+                {
+                    "type": "mcp",
+                    "server_label": "building_knowledge",
+                    "server_description": (
+                        "Foundry IQ Knowledge Base for stable Contoso building facts."
+                    ),
+                    "server_url": settings.knowledge_mcp_endpoint,
+                    "allowed_tools": ["knowledge_base_retrieve"],
+                    "headers": {"Authorization": f"Bearer {self._search_token()}"},
+                    "require_approval": "never",
+                }
+            )
+        if settings.mcp_server_url:
+            kwargs.setdefault("tools", []).append(
+                {
+                    "type": "mcp",
+                    "server_label": "building_operations",
+                    "server_description": (
+                        "Fictional current telemetry and alerts for Contoso buildings."
+                    ),
+                    "server_url": settings.mcp_server_url,
+                    "allowed_tools": READ_ONLY_TOOLS,
+                    "require_approval": "never",
+                }
+            )
 
+        return self._create_response(oai, kwargs)
+
+    def _create_response(self, oai, kwargs: dict) -> tuple[str, list[Citation]]:
         try:
             response = oai.responses.create(**kwargs)
         except Exception as exc:  # noqa: BLE001 - surface as a clean 502
@@ -117,7 +160,7 @@ class FoundryAgentClient:
 
     @staticmethod
     def _extract_citations(response) -> list[Citation]:
-        """Build citations from inline annotations and file_search retrieval results."""
+        """Build citations from inline response annotations."""
         citations: list[Citation] = []
         seen: set[str] = set()
 
@@ -129,9 +172,6 @@ class FoundryAgentClient:
             citations.append(Citation(title=title, url=url, snippet=snippet))
 
         for item in getattr(response, "output", None) or []:
-            item_type = getattr(item, "type", None)
-
-            # Inline citations the model emits in its answer.
             for content in getattr(item, "content", None) or []:
                 for ann in getattr(content, "annotations", None) or []:
                     add(
@@ -139,12 +179,6 @@ class FoundryAgentClient:
                         getattr(ann, "url", "") or "",
                         "",
                     )
-
-            # The documents the file_search tool actually retrieved.
-            if item_type == "file_search_call":
-                for result in getattr(item, "results", None) or []:
-                    text = (getattr(result, "text", None) or "").strip().replace("\n", " ")
-                    add(getattr(result, "filename", None) or "", "", text[:160])
 
         return citations
 

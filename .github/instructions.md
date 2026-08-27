@@ -44,7 +44,7 @@ Show what a developer's day feels like when the platform has an **agent at every
 ```
  🟦 WRITE            🟩 REASON            🟧 OPERATE               🟦 FIX
  GitHub Copilot  →  Foundry Agent  →     Azure       →         SRE Agent      →   Copilot coding agent
-   (VSCode)         (+ Foundry IQ)     (Container Apps)         (RCA → GitHub issue)   (PR → HITL merge)
+   (VSCode)       (Router + IQ + MCP)  (Container Apps)         (RCA → GitHub issue)   (PR → HITL merge)
         └──────────── every model call through APIM AI Gateway ────────────┘
         └──────────────── every agent governed by Agent 365 ───────────────┘
 ```
@@ -53,8 +53,10 @@ Show what a developer's day feels like when the platform has an **agent at every
 |---|---|
 | **GitHub repo + CI/CD** | Source of truth; pipeline deploys to Azure; target for the SRE Agent's issue and the coding agent's PR |
 | **GitHub Copilot (VSCode)** | Writes the app feature (agent mode) |
-| **Azure AI Foundry agent** | The reasoning behind the app; tenant-resident, model-flexible |
-| **Foundry IQ** *(optional)* | Grounds the agent in sample building/energy docs, with citations |
+| **Microsoft Foundry agent** | The reasoning behind the app; tenant-resident, tool-using, model-flexible |
+| **Model Router** | Selects an eligible model per request behind one Balanced deployment |
+| **Foundry IQ** | Grounds the agent in a reusable Azure AI Search Knowledge Base with citations |
+| **Building operations MCP** | Supplies simulated live telemetry and approval-gated actions |
 | **APIM AI Gateway** *(optional)* | Governs model calls — token limits, load-balancing, retries, managed identity; also the regression lever |
 | **Azure Container Apps** | Hosts BuildingAssist |
 | **Azure SRE Agent** | Watches the resources, root-causes the regression, opens a GitHub issue |
@@ -80,7 +82,7 @@ Keep it **routine, not dramatic** — "the kind of thing that normally eats an a
 |---|---|---|---|
 | 0:00–0:05 | **Open** — agents at every stage | Slide | — |
 | 0:05–0:17 | **Write** — code the feature | VSCode + GitHub Copilot | 🟦 Copilot |
-| 0:17–0:31 | **Reason** — the agent in Foundry *(+ APIM, + Foundry IQ)* | Azure Portal → Foundry | 🟩 Foundry |
+| 0:17–0:31 | **Reason** — Model Router + Foundry IQ + MCP tools | Azure Portal → Foundry | 🟩 Foundry |
 | 0:31–0:38 | **Operate** — meet the SRE Agent | SRE Agent config | 🟧 SRE Agent |
 | 0:38–0:48 | **Diagnose** — a routine regression | App + SRE Agent RCA | 🟧 SRE Agent |
 | 0:48–0:57 | **Fix** — coding agent closes the loop | GitHub issue → coding agent → PR → deploy | 🟦 Copilot *(HITL)* |
@@ -101,12 +103,11 @@ Set the frame: one hour as a developer building one small feature. Nothing about
 - **Why Contoso Energy cares:** delivery velocity on billable work; consistency across a delivery practice; juniors productive on day one.
 
 ### 🟩 Pillar 2 — Reason · Azure Portal → Foundry (14 min)
-- **Show:** the Foundry agent the app calls — model, instructions, tools, deployment. Run a prompt in the playground; show a grounded answer.
-- **Say:** *"The intelligence isn't hard-coded in my app — it's this agent, in your tenant, with your models and guardrails. I can swap the model without touching the app."*
+- **Show:** the agent's `model-router` deployment, instructions, Foundry IQ Knowledge Base, and MCP tools. Ask about a building-specific constraint, ask for current telemetry, then create a work order and show the approval checkpoint.
+- **Show:** open the Model Router playground and point out the underlying model selected for two prompts of different complexity. In Azure Monitor, split the router deployment metrics by underlying model.
+- **Say:** *"Stable facts come from the knowledge base, current state and actions come through MCP, and Model Router chooses an eligible model for each request. None of that orchestration is hard-coded into the UI."*
 - **Why Contoso Energy cares:** a platform, not a black box — tenant-resident, model-flexible, resellable to clients as a managed offer.
-- **⭐ Optional slot-ins (developer-platform topics that fit "for developers"):**
-  - **AI Gateway (APIM):** route model calls through the GenAI gateway — token rate-limits, load-balancing, retries, managed identity.
-  - **Foundry IQ:** ground the agent in a couple of sample docs — "the difference between an agent that sounds right and one that's right, with citations."
+- **Optional slot-in:** route model calls through APIM AI Gateway for token rate-limits, retries, observability, and managed identity.
 
 ### 🟧 Pillar 3 — Operate · Azure SRE Agent (17 min, two beats)
 - **Beat A — meet the operator (7 min):** show the SRE Agent config — resources watched (app, Foundry endpoint, APIM), scoped permissions, GitHub integration. *"Same idea as Copilot, but for running the app. Hold that thought."*
@@ -128,7 +129,7 @@ Set the frame: one hour as a developer building one small feature. Nothing about
 ## 7. Build prerequisites & setup checklist
 
 - [ ] Thin **BuildingAssist** app in a **GitHub repo** with **CI/CD to Azure Container Apps**
-- [ ] One **Foundry agent** the app calls; grounded via **Foundry IQ** on a couple of sample docs
+- [ ] One **Foundry agent** using **Model Router**, a **Foundry IQ Knowledge Base**, and the simulated **building operations MCP** server
 - [ ] **APIM AI Gateway** in front of the model (also the regression lever)
 - [ ] **Azure SRE Agent** on those resources + **GitHub issue integration** enabled
 - [ ] A **rehearsed, reproducible regression** + a **recorded fallback**
@@ -145,7 +146,7 @@ Set the frame: one hour as a developer building one small feature. Nothing about
 | Coding agent PR takes too long live | Pre-stage a branch; if it stalls, cut to a prepared PR and narrate |
 | Foundry/APIM latency during the demo | Warm up the endpoints beforehand; have the playground pre-loaded |
 | Audience drifts into deep technical Q&A | Note questions for follow-up; keep the loop moving |
-| Time overrun | Optional APIM/Foundry IQ slot-ins are the first to cut |
+| Time overrun | Cut the APIM deep dive; keep one KB question and one MCP action |
 
 ---
 
@@ -153,7 +154,7 @@ Set the frame: one hour as a developer building one small feature. Nothing about
 
 - [ ] Assign a builder + timeline for the environment (Section 7)
 - [ ] Rehearse the regression until reliable
-- [ ] Decide whether to include the optional APIM + Foundry IQ beats
+- [ ] Rehearse the Foundry IQ → MCP read → MCP approval sequence
 - [ ] Optional companion assets: slide deck to present, one-page runbook, or an interactive HTML storyboard + seller prep guide
 - [ ] Book the follow-up workshop offer as the demo CTA
 
