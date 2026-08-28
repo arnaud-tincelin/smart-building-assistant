@@ -24,6 +24,22 @@ if [[ "$repository" != */* ]]; then
   exit 1
 fi
 
+github_owner="${repository%%/*}"
+github_repository="${repository#*/}"
+IFS=$'\t' read -r github_owner_id github_repository_id < <(
+  gh api "repos/$repository" --jq '[.owner.id, .id] | @tsv'
+)
+github_subject_prefix="$(
+  gh api "repos/$repository/actions/oidc/customization/sub" --jq '.sub_claim_prefix // empty'
+)"
+legacy_subject_prefix="repo:$repository"
+immutable_subject_prefix="repo:${github_owner}@${github_owner_id}/${github_repository}@${github_repository_id}"
+if [[ "$github_subject_prefix" != "$legacy_subject_prefix" &&
+      "$github_subject_prefix" != "$immutable_subject_prefix" ]]; then
+  echo "GitHub returned an unexpected OIDC subject prefix: $github_subject_prefix" >&2
+  exit 1
+fi
+
 branch="${GITHUB_BRANCH:-main}"
 location="${AZURE_LOCATION:-}"
 if [[ -z "$location" ]]; then
@@ -36,8 +52,6 @@ template_file="$root/infra/github-oidc.bicep"
 deployment_name="${AZURE_GITHUB_DEPLOYMENT_NAME:-buildingassist-github-cicd}"
 identity_resource_group="${AZURE_GITHUB_IDENTITY_RESOURCE_GROUP:-rg-buildingassist-cicd}"
 identity_name="${AZURE_GITHUB_IDENTITY_NAME:-id-buildingassist-github}"
-github_owner="${repository%%/*}"
-github_repository="${repository#*/}"
 subscription_id="$(az account show --query id --output tsv)"
 tenant_id="$(az account show --query tenantId --output tsv)"
 
@@ -51,11 +65,13 @@ echo "Branch       : $branch"
 echo "Subscription : $subscription_id"
 echo "Location     : $location"
 echo "Identity     : $identity_name"
+echo "OIDC subject : ${github_subject_prefix}:ref:refs/heads/$branch"
 
 deployment_parameters=(
   "location=$location"
   "githubOwner=$github_owner"
   "githubRepository=$github_repository"
+  "githubSubjectPrefix=$github_subject_prefix"
   "githubBranch=$branch"
   "identityResourceGroupName=$identity_resource_group"
   "identityName=$identity_name"
@@ -94,7 +110,7 @@ federated_subject="$(az identity federated-credential show \
   --name "github-$branch" \
   --query subject \
   --output tsv)"
-expected_subject="repo:$repository:ref:refs/heads/$branch"
+expected_subject="${github_subject_prefix}:ref:refs/heads/$branch"
 if [[ "$federated_subject" != "$expected_subject" ]]; then
   echo "Federated credential subject does not match $expected_subject." >&2
   exit 1

@@ -5,8 +5,7 @@ metadata description = 'User-assigned identity and GitHub branch federated crede
 param location string
 param tags object
 param identityName string
-param githubOwner string
-param githubRepository string
+param githubSubject string
 param githubBranch string
 
 resource deploymentIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
@@ -23,7 +22,7 @@ resource githubCredential 'Microsoft.ManagedIdentity/userAssignedIdentities/fede
       'api://AzureADTokenExchange'
     ]
     issuer: 'https://token.actions.githubusercontent.com'
-    subject: 'repo:${githubOwner}/${githubRepository}:ref:refs/heads/${githubBranch}'
+    subject: githubSubject
   }
 }
 

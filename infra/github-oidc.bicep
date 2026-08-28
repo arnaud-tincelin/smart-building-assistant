@@ -17,6 +17,9 @@ param githubOwner string
 @description('GitHub repository name, without the owner.')
 param githubRepository string
 
+@description('Repository subject prefix reported by GitHub. Leave empty to use the legacy owner/repository format.')
+param githubSubjectPrefix string = ''
+
 @minLength(1)
 @description('Branch allowed to request Azure tokens.')
 param githubBranch string = 'main'
@@ -33,6 +36,9 @@ var tags = {
 }
 var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 var rbacAdministratorRoleId = 'f58310d9-a9f6-439a-9e8d-f62e7b41a168'
+var resolvedGithubSubjectPrefix = empty(githubSubjectPrefix)
+  ? 'repo:${githubOwner}/${githubRepository}'
+  : githubSubjectPrefix
 var deploymentIdentityId = resourceId(
   subscription().subscriptionId,
   identityResourceGroupName,
@@ -50,8 +56,7 @@ module deploymentIdentity 'modules/github-oidc-identity.bicep' = {
   scope: identityResourceGroup
   params: {
     githubBranch: githubBranch
-    githubOwner: githubOwner
-    githubRepository: githubRepository
+    githubSubject: '${resolvedGithubSubjectPrefix}:ref:refs/heads/${githubBranch}'
     identityName: identityName
     location: location
     tags: tags

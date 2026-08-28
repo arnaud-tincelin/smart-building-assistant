@@ -19,7 +19,9 @@ managed identity defined by `infra/github-oidc.bicep`.
    Never request or handle a password, token, PAT, or client secret.
 3. Resolve the target repository with `gh repo view`, the subscription with
    `az account show`, and the location from `AZURE_LOCATION` or the existing GitHub
-   variable. Show these non-secret targets before changing cloud resources.
+   variable. Resolve the repository subject prefix from GitHub's OIDC customization
+   endpoint and validate it against the repository's numeric IDs. Show these
+   non-secret targets before changing cloud resources.
 4. Run the helper from the repository root:
 
    ```bash
@@ -55,7 +57,8 @@ bash .github/skills/azure-github-oidc/scripts/configure.sh
 - Use `infra/github-oidc.bicep`; do not replace it with imperative Azure resource
   creation.
 - Always run the subscription deployment `what-if` before applying it.
-- Trust only `repo:<owner>/<repository>:ref:refs/heads/<branch>`.
+- Trust only the exact repository subject prefix reported by GitHub, followed by
+  `:ref:refs/heads/<branch>`; never use a wildcard subject.
 - Store tenant, subscription, client, and location IDs as GitHub variables, not
   secrets. They are identifiers, not credentials.
 - Never create an application client secret or a GitHub PAT.

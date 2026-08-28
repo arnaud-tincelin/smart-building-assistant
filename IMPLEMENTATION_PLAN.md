@@ -53,7 +53,7 @@ Docker-in-Docker**.
   export, and an OpenAPI-backed MCP ToolServer.
 - **Operate:** Azure SRE Agent (`Microsoft.App/agents`) provisioned in Bicep, with a
   scoped managed identity, an Action Group, and a metric alert on the backend.
-- **Dev env:** `.devcontainer` with Python 3.12 + **uv**, Node 22 + **npm**, azd,
+- **Dev env:** `.devcontainer` with Python 3.12 + **uv**, Node 26 + **npm**, azd,
   Bicep, Azure CLI. **No Docker-in-Docker** (ACR remote build instead).
 
 ## Architecture (what Bicep provisions)
@@ -71,7 +71,7 @@ SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Fou
 ## Todos (high level)
 
 1. **devcontainer** — `.devcontainer/devcontainer.json` + features: Python 3.12 +
-   **uv**, Node 22 + **npm**, azd, az CLI, Bicep. **No Docker-in-Docker**;
+  **uv**, Node 26 + **npm**, azd, az CLI, Bicep. **No Docker-in-Docker**;
    post-create runs `uv sync` (backend) and `npm install` (frontend).
 2. **app-skeleton** — FastAPI **backend** (`src/backend`): `/healthz` + `/ask`
    endpoint (energy question → Foundry agent answer with sources); CORS for the

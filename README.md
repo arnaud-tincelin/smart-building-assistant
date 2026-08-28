@@ -41,7 +41,7 @@ SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Fou
 
 ## Prerequisites
 
-- The provided **`.devcontainer`** (Python 3.14 + uv, Node 22 + npm, azd, Azure CLI,
+- The provided **`.devcontainer`** (Python 3.14 + uv, Node 26 + npm, azd, Azure CLI,
   Bicep, GitHub CLI). No Docker daemon needed — ACR builds images server-side.
 - An Azure subscription and `az login` / `azd auth login`.
 - A region where Foundry Agent Service, APIM, Container Apps, and the SRE Agent are
