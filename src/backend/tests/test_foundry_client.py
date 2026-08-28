@@ -34,7 +34,8 @@ def test_foundry_request_invokes_the_prompt_agent_by_default(
     )
 
     monkeypatch.setattr(settings, "use_mock_agent", False)
-    monkeypatch.setattr(settings, "project_endpoint", "https://example.test/project")
+    monkeypatch.setattr(settings, "project_endpoint",
+                        "https://example.test/project")
     monkeypatch.setattr(settings, "agent_name", "buildingassist-agent")
 
     answer, citations = client.ask("What is happening at Paris HQ?")
@@ -62,14 +63,16 @@ def test_foundry_request_combines_foundry_iq_with_read_only_operations(
     client._search_token_provider = lambda: "search-token"
 
     monkeypatch.setattr(settings, "use_mock_agent", False)
-    monkeypatch.setattr(settings, "project_endpoint", "https://example.test/project")
+    monkeypatch.setattr(settings, "project_endpoint",
+                        "https://example.test/project")
     monkeypatch.setattr(settings, "agent_name", "")
     monkeypatch.setattr(
         settings,
         "knowledge_mcp_endpoint",
         "https://search.example.test/knowledgebases/buildingassist/mcp",
     )
-    monkeypatch.setattr(settings, "mcp_server_url", "https://api.example.test/mcp/")
+    monkeypatch.setattr(settings, "mcp_server_url",
+                        "https://api.example.test/mcp/")
 
     answer, citations = client.ask("What is happening at Paris HQ?")
 
@@ -78,7 +81,8 @@ def test_foundry_request_combines_foundry_iq_with_read_only_operations(
     assert responses.kwargs["model"] == settings.model_deployment
     knowledge_tool, operations_tool = responses.kwargs["tools"]
     assert knowledge_tool["allowed_tools"] == ["knowledge_base_retrieve"]
-    assert knowledge_tool["headers"] == {"Authorization": "Bearer search-token"}
+    assert knowledge_tool["headers"] == {
+        "Authorization": "Bearer search-token"}
     assert operations_tool["server_url"] == "https://api.example.test/mcp/"
     assert operations_tool["allowed_tools"] == READ_ONLY_MCP_TOOLS
     assert operations_tool["require_approval"] == "never"

@@ -21,13 +21,16 @@ def _operations_by_id(schema: dict) -> dict[str, tuple[str, str]]:
 def test_openapi_exposes_stable_operations_for_apim_tools() -> None:
     runtime_schema = TestClient(app).get("/openapi.json").json()
     deployed_schema_path = (
-        Path(__file__).parents[3] / "infra/api/building-operations.openapi.json"
+        Path(__file__).parents[3] /
+        "infra/api/building-operations.openapi.json"
     )
     deployed_schema = json.loads(deployed_schema_path.read_text())
-    expected_operation_ids = set(READ_ONLY_API_OPERATIONS + ACTION_API_OPERATIONS)
+    expected_operation_ids = set(
+        READ_ONLY_API_OPERATIONS + ACTION_API_OPERATIONS)
 
     assert set(_operations_by_id(runtime_schema)) == expected_operation_ids
-    assert _operations_by_id(deployed_schema) == _operations_by_id(runtime_schema)
+    assert _operations_by_id(
+        deployed_schema) == _operations_by_id(runtime_schema)
 
 
 def test_operations_api_exposes_read_and_action_endpoints() -> None:

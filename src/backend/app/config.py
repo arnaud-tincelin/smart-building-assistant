@@ -63,4 +63,5 @@ class Settings(BaseSettings):
             return ["*"]
         return [o.strip() for o in raw.split(",") if o.strip()]
 
+
 settings = Settings()

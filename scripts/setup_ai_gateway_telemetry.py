@@ -105,7 +105,8 @@ def _get_otlp_configuration(
             return properties
         time.sleep(3)
 
-    raise RuntimeError("Application Insights OTLP endpoints were not ready within 180 seconds.")
+    raise RuntimeError(
+        "Application Insights OTLP endpoints were not ready within 180 seconds.")
 
 
 def _grant_metrics_publisher(
@@ -209,7 +210,8 @@ def main() -> int:
         )
         principal_id = gateway.get("identity", {}).get("principalId")
         if not principal_id:
-            raise RuntimeError("AI Gateway system-assigned identity has no principal ID.")
+            raise RuntimeError(
+                "AI Gateway system-assigned identity has no principal ID.")
 
         _grant_metrics_publisher(
             token,

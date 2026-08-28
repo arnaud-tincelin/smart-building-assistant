@@ -42,7 +42,8 @@ from app.agent_policy import (
     READ_ONLY_MCP_TOOLS,
 )
 
-AGENT_NAME = os.environ.get("BUILDINGASSIST_AGENT_NAME", "buildingassist-agent")
+AGENT_NAME = os.environ.get(
+    "BUILDINGASSIST_AGENT_NAME", "buildingassist-agent")
 MODEL_DEPLOYMENT = (
     os.environ.get("AZURE_AI_MODEL_DEPLOYMENT_NAME")
     or os.environ.get("AZURE_AI_MODEL_DEPLOYMENT")
@@ -53,7 +54,8 @@ MCP_SERVER_URL = os.environ.get("BUILDINGASSIST_MCP_SERVER_URL", "")
 MCP_CONNECTION = os.environ.get(
     "BUILDINGASSIST_MCP_CONNECTION", "buildingassist-operations"
 )
-KNOWLEDGE_MCP_ENDPOINT = os.environ.get("BUILDINGASSIST_KNOWLEDGE_MCP_ENDPOINT", "")
+KNOWLEDGE_MCP_ENDPOINT = os.environ.get(
+    "BUILDINGASSIST_KNOWLEDGE_MCP_ENDPOINT", "")
 KNOWLEDGE_CONNECTION = os.environ.get(
     "BUILDINGASSIST_KNOWLEDGE_CONNECTION", "buildingassist-knowledge"
 )
@@ -140,16 +142,19 @@ def _ensure_agent(client: AIProjectClient) -> None:
         definition=desired,
         description="Grounded smart-building assistant with simulated MCP operations.",
     )
-    print(f"Registered {AGENT_NAME!r} version {getattr(version, 'version', '?')}.")
+    print(
+        f"Registered {AGENT_NAME!r} version {getattr(version, 'version', '?')}.")
 
 
 def main() -> int:
     endpoint = os.environ.get("AZURE_AI_PROJECT_ENDPOINT")
     if not endpoint:
-        print("AZURE_AI_PROJECT_ENDPOINT is not set — skipping agent setup.", file=sys.stderr)
+        print(
+            "AZURE_AI_PROJECT_ENDPOINT is not set — skipping agent setup.", file=sys.stderr)
         return 0
 
-    client = AIProjectClient(endpoint=endpoint, credential=DefaultAzureCredential())
+    client = AIProjectClient(
+        endpoint=endpoint, credential=DefaultAzureCredential())
     _ensure_agent(client)
     print(f"BUILDINGASSIST_AGENT_NAME={AGENT_NAME}")
     return 0
