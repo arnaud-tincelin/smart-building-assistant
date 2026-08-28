@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Iterable
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import RLock
 from typing import Literal
 
-_DEFAULT_DATA_PATH = Path(__file__).parent / "data" / "building_operations.json"
+_DEFAULT_DATA_PATH = Path(__file__).parent / "data" / \
+    "building_operations.json"
 
 
 class BuildingOperations:
@@ -80,7 +82,7 @@ class BuildingOperations:
         with self._lock:
             building = self._building(building_id)
             work_order = {
-                "id": f"WO-{len(self._state['work_orders']) + 1:04d}",
+                "id": self._next_id("WO", self._state["work_orders"]),
                 "building_id": building["id"],
                 "building_name": building["name"],
                 "title": title.strip(),
@@ -105,16 +107,19 @@ class BuildingOperations:
             access_point = self._access_point(building["id"], access_point_id)
             credential = self._credential(credential_id)
             if method not in access_point["methods"]:
-                raise ValueError(f"Access point {access_point['id']!r} does not accept {method}.")
+                raise ValueError(
+                    f"Access point {access_point['id']!r} does not accept {method}.")
             if credential["method"] != method:
-                raise ValueError("The credential type does not match the access method.")
+                raise ValueError(
+                    "The credential type does not match the access method.")
             if credential["status"] != "active":
                 raise ValueError("The credential is not active.")
             if building["id"] not in credential["building_ids"]:
-                raise ValueError("The credential is not authorized for this building.")
+                raise ValueError(
+                    "The credential is not authorized for this building.")
 
             event = {
-                "id": f"SEC-EVT-{len(self._state['security']['audit_events']) + 1:04d}",
+                "id": self._next_id("SEC-EVT", self._state["security"]["audit_events"]),
                 "operation": "access_request",
                 "building_id": building["id"],
                 "access_point_id": access_point["id"],
@@ -138,13 +143,14 @@ class BuildingOperations:
     ) -> dict:
         values = (visitor_name, visitor_email, host_name, purpose)
         if any(not value.strip() for value in values):
-            raise ValueError("Visitor name, email, host, and purpose are required.")
+            raise ValueError(
+                "Visitor name, email, host, and purpose are required.")
 
         with self._lock:
             building = self._building(building_id)
             access_point = self._access_point(building["id"], access_point_id)
             visitor = {
-                "id": f"VIS-{len(self._state['security']['visitors']) + 1:04d}",
+                "id": self._next_id("VIS", self._state["security"]["visitors"]),
                 "building_id": building["id"],
                 "access_point_id": access_point["id"],
                 "visitor_name": visitor_name.strip(),
@@ -155,7 +161,7 @@ class BuildingOperations:
                 "checked_in_at": self._now(),
             }
             event = {
-                "id": f"SEC-EVT-{len(self._state['security']['audit_events']) + 1:04d}",
+                "id": self._next_id("SEC-EVT", self._state["security"]["audit_events"]),
                 "operation": "visitor_check_in",
                 "building_id": building["id"],
                 "access_point_id": access_point["id"],
@@ -210,7 +216,7 @@ class BuildingOperations:
             zone["setpoint_c"] = temperature_c
             building["telemetry"]["hvac_setpoint_c"] = temperature_c
             action = {
-                "id": f"ACT-{len(self._state['actions']) + 1:04d}",
+                "id": self._next_id("ACT", self._state["actions"]),
                 "type": "temporary_hvac_setpoint",
                 "building_id": building["id"],
                 "zone_id": zone["id"],
@@ -226,28 +232,44 @@ class BuildingOperations:
             self._state["actions"].append(action)
             return deepcopy(action)
 
+    @staticmethod
+    def _find(items: Iterable[dict], match: Callable[[dict], bool], error: str) -> dict:
+        for item in items:
+            if match(item):
+                return item
+        raise ValueError(error)
+
     def _building(self, building_id: str) -> dict:
         normalized = building_id.strip().lower()
-        for building in self._state["buildings"]:
-            if building["id"] == normalized:
-                return building
-        raise ValueError(f"Unknown building_id {building_id!r}.")
+        return self._find(
+            self._state["buildings"],
+            lambda building: building["id"] == normalized,
+            f"Unknown building_id {building_id!r}.",
+        )
 
     def _access_point(self, building_id: str, access_point_id: str) -> dict:
         normalized = access_point_id.strip().lower()
-        for access_point in self._state["security"]["access_points"]:
-            if access_point["building_id"] == building_id and access_point["id"] == normalized:
-                return access_point
-        raise ValueError(
-            f"Unknown access_point_id {access_point_id!r} for building {building_id!r}."
+        return self._find(
+            self._state["security"]["access_points"],
+            lambda point: point["building_id"] == building_id and point["id"] == normalized,
+            f"Unknown access_point_id {access_point_id!r} for building {building_id!r}.",
         )
 
     def _credential(self, credential_id: str) -> dict:
         normalized = credential_id.strip().upper()
-        for credential in self._state["security"]["credentials"]:
-            if credential["id"] == normalized:
-                return credential
-        raise ValueError(f"Unknown credential_id {credential_id!r}.")
+        return self._find(
+            self._state["security"]["credentials"],
+            lambda credential: credential["id"] == normalized,
+            f"Unknown credential_id {credential_id!r}.",
+        )
+
+    def _zone(self, building: dict, zone_id: str) -> dict:
+        normalized = zone_id.strip().lower()
+        return self._find(
+            building["zones"],
+            lambda zone: zone["id"] == normalized,
+            f"Unknown zone_id {zone_id!r} for building {building['id']!r}.",
+        )
 
     @staticmethod
     def _serialize_security_event(event: dict) -> str:
@@ -260,24 +282,18 @@ class BuildingOperations:
         )
 
     @staticmethod
-    def _zone(building: dict, zone_id: str) -> dict:
-        normalized = zone_id.strip().lower()
-        for zone in building["zones"]:
-            if zone["id"] == normalized:
-                return zone
-        raise ValueError(
-            f"Unknown zone_id {zone_id!r} for building {building['id']!r}."
-        )
+    def _next_id(prefix: str, collection: list) -> str:
+        return f"{prefix}-{len(collection) + 1:04d}"
 
     @staticmethod
-    def _now() -> str:
-        return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    def _iso_z(moment: datetime) -> str:
+        return moment.isoformat().replace("+00:00", "Z")
 
-    @staticmethod
-    def _future_time(duration_minutes: int) -> str:
-        return (
-            datetime.now(UTC) + timedelta(minutes=duration_minutes)
-        ).isoformat().replace("+00:00", "Z")
+    def _now(self) -> str:
+        return self._iso_z(datetime.now(UTC))
+
+    def _future_time(self, duration_minutes: int) -> str:
+        return self._iso_z(datetime.now(UTC) + timedelta(minutes=duration_minutes))
 
 
 operations = BuildingOperations()

@@ -15,8 +15,11 @@ def test_agent_policy_is_closed_book_with_exact_unknown_response() -> None:
 
 def test_agent_policy_defines_separate_information_and_data_tools() -> None:
     assert READ_ONLY_MCP_TOOLS == [
-        "list_buildings",
-        "get_building_information",
-        "get_building_data",
+        "operations_listBuildings",
+        "operations_getBuildingInformation",
+        "operations_getBuildingData",
     ]
-    assert ACTION_MCP_TOOLS == ["create_work_order", "set_hvac_setpoint"]
+    assert ACTION_MCP_TOOLS == [
+        "operations_createWorkOrder",
+        "operations_setHvacSetpoint",
+    ]

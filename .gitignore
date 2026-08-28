@@ -13,6 +13,7 @@ node_modules/
 dist/
 build/
 *.local
+*.tsbuildinfo
 
 # Azure Developer CLI
 .azure/

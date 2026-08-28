@@ -31,8 +31,6 @@ export interface VisitorCheckInRequest {
 
 export interface SecurityOperationResponse {
   id: string;
-  status?: string;
-  decision?: string;
 }
 
 export class ApiError extends Error {

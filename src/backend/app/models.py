@@ -51,3 +51,23 @@ class VisitorCheckInRequest(BaseModel):
     visitor_email: str = Field(..., min_length=3, max_length=254)
     host_name: str = Field(..., min_length=1, max_length=120)
     purpose: str = Field(..., min_length=1, max_length=240)
+
+
+class WorkOrderRequest(BaseModel):
+    """A fictional maintenance work order requested through the operations API."""
+
+    building_id: str = Field(..., min_length=1, max_length=64)
+    title: str = Field(..., min_length=1, max_length=160)
+    reason: str = Field(..., min_length=1, max_length=500)
+    priority: Literal["low", "medium", "high"] = "medium"
+
+
+class HvacSetpointRequest(BaseModel):
+    """A temporary fictional HVAC setpoint requested through the operations API."""
+
+    building_id: str = Field(..., min_length=1, max_length=64)
+    zone_id: str = Field(..., min_length=1, max_length=64)
+    temperature_c: float
+    duration_minutes: int = Field(..., gt=0)
+    reason: str = Field(..., min_length=1, max_length=500)
+    confirmed: bool = False

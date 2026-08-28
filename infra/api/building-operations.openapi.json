@@ -1,0 +1,223 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Contoso Building Operations API",
+    "version": "1.0.0",
+    "description": "Fictional building metadata, telemetry, alerts, and bounded actions for the BuildingAssist demo."
+  },
+  "servers": [
+    {
+      "url": "__BACKEND_URL__"
+    }
+  ],
+  "paths": {
+    "/operations/buildings": {
+      "get": {
+        "operationId": "listBuildings",
+        "summary": "List buildings",
+        "description": "List buildings available in the simulated operations platform.",
+        "responses": {
+          "200": {
+            "description": "The simulated building portfolio.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operations/buildings/{building_id}/information": {
+      "get": {
+        "operationId": "getBuildingInformation",
+        "summary": "Get building information",
+        "description": "Get authoritative metadata, specificities, zones, and policy for a building.",
+        "parameters": [
+          {
+            "name": "building_id",
+            "in": "path",
+            "required": true,
+            "description": "Building identifier returned by listBuildings.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stable information for the requested building.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The building identifier is unknown."
+          }
+        }
+      }
+    },
+    "/operations/buildings/{building_id}/data": {
+      "get": {
+        "operationId": "getBuildingData",
+        "summary": "Get current building data",
+        "description": "Get time-stamped telemetry, zone measurements, and active alerts for a building.",
+        "parameters": [
+          {
+            "name": "building_id",
+            "in": "path",
+            "required": true,
+            "description": "Building identifier returned by listBuildings.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current simulated data for the requested building.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The building identifier is unknown."
+          }
+        }
+      }
+    },
+    "/operations/work-orders": {
+      "post": {
+        "operationId": "createWorkOrder",
+        "summary": "Create a work order",
+        "description": "Create a fictional maintenance work order in the simulator.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "building_id",
+                  "title",
+                  "reason"
+                ],
+                "properties": {
+                  "building_id": {
+                    "type": "string",
+                    "description": "Building identifier returned by listBuildings."
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Short maintenance work order title."
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "Sourced reason for creating the work order."
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ],
+                    "default": "medium"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The created fictional work order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request violates the simulator policy."
+          }
+        }
+      }
+    },
+    "/operations/hvac-setpoints": {
+      "post": {
+        "operationId": "setHvacSetpoint",
+        "summary": "Set a temporary HVAC setpoint",
+        "description": "Apply a temporary fictional HVAC setpoint after explicit confirmation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "building_id",
+                  "zone_id",
+                  "temperature_c",
+                  "duration_minutes",
+                  "reason"
+                ],
+                "properties": {
+                  "building_id": {
+                    "type": "string"
+                  },
+                  "zone_id": {
+                    "type": "string"
+                  },
+                  "temperature_c": {
+                    "type": "number"
+                  },
+                  "duration_minutes": {
+                    "type": "integer"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "confirmed": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirmation request or applied fictional setpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request violates the simulator policy."
+          }
+        }
+      }
+    }
+  }
+}

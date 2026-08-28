@@ -3,7 +3,7 @@ name = "buildingassist-backend"
 version = "0.1.0"
 description = "BuildingAssist demo backend — FastAPI service that calls an Azure AI Foundry agent."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
@@ -11,7 +11,6 @@ dependencies = [
     "pydantic-settings>=2.5.0",
     "azure-ai-projects>=1.0.0b7",
     "azure-identity>=1.19.0",
-    "mcp>=2.0.0,<3",
     "azure-search-documents>=12,<13",
     "azure-monitor-opentelemetry>=1.8.9,<2",
     "azure-core-tracing-opentelemetry>=1.0.0b13,<2",
@@ -42,7 +41,7 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

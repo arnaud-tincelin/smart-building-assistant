@@ -123,7 +123,6 @@ resource appInsightsConnection 'Microsoft.CognitiveServices/accounts/projects/co
 }
 
 output accountName string = account.name
-output accountId string = account.id
 output accountEndpoint string = account.properties.endpoint
 output projectName string = project.name
 output projectId string = project.id
@@ -134,6 +133,5 @@ output modelDeploymentName string = modelDeployment.name
 output modelDeploymentId string = modelDeployment.id
 output modelVersion string = modelVersion
 output modelCapacity int = modelCapacity
-output openAiEndpoint string = 'https://${account.name}.openai.azure.com/'
 output knowledgeConnectionName string = knowledgeConnection.name
 output appInsightsConnectionName string = appInsightsConnection.name

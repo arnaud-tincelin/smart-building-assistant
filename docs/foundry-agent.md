@@ -10,7 +10,9 @@ The root `azd up` creates the Reason portion of the demo end to end:
   Knowledge Base MCP endpoint
 - Workspace-based Application Insights and a project-level `AppInsights` connection
 - Prompt agent named `buildingassist-agent`
-- Public building-operations MCP endpoint at the backend's `/mcp/` route
+- Building-operations OpenAPI document imported into the AI Gateway ToolServer
+- Runtime-key-protected MCP endpoint generated from the REST operations
+- Key-authenticated `RemoteTool` connection from Foundry to the APIM MCP endpoint
 
 ## Information boundaries
 
@@ -32,21 +34,25 @@ use model knowledge or infer missing values. If a source fails, returns no resul
 does not contain all data needed to answer, the complete response is exactly
 `i don't know`.
 
-## MCP tools
+## Operations API and MCP tools
 
-The backend exposes one Streamable HTTP MCP endpoint at `/mcp/`. MCP clients discover
-these separate read operations, which run without approval:
+The backend exposes ordinary FastAPI routes under `/operations`. The APIM AI Gateway
+imports their OpenAPI contract into the `building-operations` ToolServer at
+`/default/toolservers/building-operations/mcp`. Foundry stores the gateway `Api-Key`
+header in the `buildingassist-operations` project connection.
 
-- `list_buildings`: enumerate buildings and their canonical IDs
-- `get_building_information`: retrieve stable metadata, systems, zones, specificities,
+MCP clients discover these separate read operations, which run without approval:
+
+- `operations_listBuildings`: enumerate buildings and their canonical IDs
+- `operations_getBuildingInformation`: retrieve stable metadata, systems, zones, specificities,
   and operating policy for one building
-- `get_building_data`: retrieve time-stamped telemetry, zone measurements, status,
+- `operations_getBuildingData`: retrieve time-stamped telemetry, zone measurements, status,
   and active alerts for one building
 
 State-changing tools trigger a Foundry MCP approval request:
 
-- `create_work_order`
-- `set_hvac_setpoint`
+- `operations_createWorkOrder`
+- `operations_setHvacSetpoint`
 
 Everything returned or changed by these tools is fictional, in-memory simulation
 data. HVAC changes also require `confirmed=true` and enforce per-building temperature,
@@ -75,14 +81,29 @@ Monitoring Data Reader on Application Insights. After an invocation, open the Fo
 project, select **Agents** > **Traces**, and filter by `buildingassist-agent`.
 Ingestion normally takes 2-5 minutes.
 
+## AI Gateway telemetry
+
+The AI Gateway uses the same workspace-based Application Insights resource as the
+application. `scripts/setup_ai_gateway_telemetry.py` completes the dynamic Azure
+Monitor setup after Bicep provisioning:
+
+- enables OTLP ingestion on Application Insights
+- discovers its generated metrics, logs, and traces endpoints and Data Collection Rule
+- grants the gateway system identity `Monitoring Metrics Publisher` on that rule
+- creates the workspace `OpenTelemetry` exporter with managed identity
+- leaves payload capture disabled
+
+The AI Gateway monitoring dashboard currently visualizes model token metrics. The
+preview doesn't export MCP tool telemetry or distributed traces through this path.
+
 ## Demo sequence
 
 Open `buildingassist-agent` in the Foundry agent playground.
 
 1. Ask: `Which building is most suitable for demand response, and why?`
-   Show `list_buildings`, `get_building_information`, and grounded citations.
+   Show `operations_listBuildings`, `operations_getBuildingInformation`, and grounded citations.
 2. Ask: `What is happening at Paris HQ now, and are there active alerts?`
-   Show the time-stamped `get_building_data` MCP call.
+   Show the time-stamped `operations_getBuildingData` MCP call.
 3. Ask: `Create a high-priority work order to inspect the Floor 3 air handling unit.`
    Inspect the arguments, approve the MCP action, and show the simulated work-order ID.
 4. Ask: `Temporarily set Paris HQ Floor 3 to 24 C for 60 minutes to reduce peak demand.`
@@ -103,6 +124,7 @@ objects against the selected root azd environment:
 
 ```bash
 cd src/backend
+uv run python ../../scripts/setup_ai_gateway_telemetry.py
 uv run python ../../scripts/setup_foundry_iq.py
 uv run python ../../scripts/setup_foundry_agent.py
 ```
@@ -117,8 +139,8 @@ the setup scripts and Bicep resources are idempotent.
 
 ## Production boundary
 
-The operations MCP endpoint is intentionally unauthenticated because it contains
-only disposable fictional data. Before connecting real building-management systems,
-put MCP behind authenticated APIM, persist state and audit events, apply role-based
-authorization per tool and site, retain approval for every control action, and add
-idempotency keys plus rollback workflows.
+The operations MCP endpoint requires an AI Gateway runtime key stored as a Foundry
+project connection. Before connecting real building-management systems, replace the
+shared key when the preview supports the required client identity model, persist state
+and audit events, apply role-based authorization per tool and site, retain approval
+for every control action, and add idempotency keys plus rollback workflows.

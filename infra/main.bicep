@@ -4,9 +4,9 @@ metadata description = '''
 BuildingAssist demo infrastructure for "A Developer's Day on the Microsoft Agentic
 Platform". Provisions: Log Analytics + App Insights, ACR (remote builds), a user-
 assigned identity, a Container Apps environment with two apps (backend + frontend),
-an Azure AI Foundry account/project/model, and an APIM AI Gateway in front of the
-model. The Foundry agent + Foundry IQ knowledge and the SRE Agent are created
-post-provision (see README and docs/sre-agent.md).
+an Azure AI Foundry account/project/model, and one APIM AI Gateway for models and
+OpenAPI-backed MCP tools. The Foundry agent + Foundry IQ knowledge and the SRE Agent
+are created post-provision (see README and docs/sre-agent.md).
 '''
 
 @minLength(1)
@@ -127,8 +127,18 @@ module apim 'modules/apim.bicep' = {
     modelDeploymentName: foundry.outputs.modelDeploymentName
     modelVersion: foundry.outputs.modelVersion
     tokenLimitPerMinute: foundry.outputs.modelCapacity * 1000
-    appInsightsResourceId: monitoring.outputs.appInsightsId
-    appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
+    backendUrl: backendUrl
+  }
+}
+
+module operationsMcpConnection 'modules/foundry-mcp-connection.bicep' = {
+  scope: resourceGroup
+  params: {
+    foundryAccountName: foundry.outputs.accountName
+    foundryProjectName: foundry.outputs.projectName
+    connectionName: 'buildingassist-operations'
+    mcpServerUrl: apim.outputs.operationsMcpEndpoint
+    apiKey: apim.outputs.runtimeApiKey
   }
 }
 
@@ -164,14 +174,6 @@ module backend 'modules/container-app.bicep' = {
       {
         name: 'BUILDINGASSIST_KNOWLEDGE_MCP_ENDPOINT'
         value: knowledgeMcpEndpoint
-      }
-      {
-        name: 'BUILDINGASSIST_MCP_SERVER_URL'
-        value: '${backendUrl}/mcp/'
-      }
-      {
-        name: 'BUILDINGASSIST_MCP_ALLOWED_HOSTS'
-        value: backendHost
       }
       {
         name: 'BUILDINGASSIST_AZURE_CLIENT_ID'
@@ -277,4 +279,8 @@ output AI_GATEWAY_MODEL_ENDPOINT string = apim.outputs.modelEndpoint
 output AI_GATEWAY_MODEL string = apim.outputs.modelName
 output AI_GATEWAY_API_KEY_RESOURCE_ID string = apim.outputs.runtimeApiKeyId
 output AI_GATEWAY_CONNECTOR_NAMESPACE_RESOURCE_ID string = apim.outputs.connectorNamespaceId
+output AI_GATEWAY_TELEMETRY_EXPORTER_RESOURCE_ID string = '${apim.outputs.apimId}/workspaces/default/telemetryExporters/appinsights'
+output BUILDINGASSIST_OPERATIONS_API_URL string = '${backendUrl}/operations'
+output BUILDINGASSIST_MCP_SERVER_URL string = apim.outputs.operationsMcpEndpoint
+output BUILDINGASSIST_MCP_CONNECTION string = operationsMcpConnection.outputs.connectionName
 output SRE_AGENT_NAME string = sreAgent.outputs.agentName

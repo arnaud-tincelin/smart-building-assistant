@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # Authenticated Azure AI Search Knowledge Base MCP endpoint (Foundry IQ).
     knowledge_mcp_endpoint: str = ""
 
-    # Public Streamable HTTP endpoint for the simulated building-operations MCP server.
+    # APIM-hosted MCP endpoint, used only when composing Responses tools directly.
     mcp_server_url: str = ""
 
     # System instructions for the agent.
@@ -51,10 +51,6 @@ class Settings(BaseSettings):
     # CORS: comma-separated list of allowed frontend origins. "*" allows all.
     allowed_origins: str = "*"
 
-    # Hosts and browser origins accepted by the public MCP Streamable HTTP endpoint.
-    mcp_allowed_hosts: str = "localhost,localhost:*,127.0.0.1,127.0.0.1:*,testserver"
-    mcp_allowed_origins: str = "http://localhost:*,http://127.0.0.1:*"
-
     # When true, skip the real Foundry call and return a canned answer. Handy for
     # local development and tests without Azure credentials.
     use_mock_agent: bool = False
@@ -66,18 +62,5 @@ class Settings(BaseSettings):
         if raw == "*" or not raw:
             return ["*"]
         return [o.strip() for o in raw.split(",") if o.strip()]
-
-    @property
-    def mcp_allowed_hosts_list(self) -> list[str]:
-        return [host.strip() for host in self.mcp_allowed_hosts.split(",") if host.strip()]
-
-    @property
-    def mcp_allowed_origins_list(self) -> list[str]:
-        return [
-            origin.strip()
-            for origin in self.mcp_allowed_origins.split(",")
-            if origin.strip()
-        ]
-
 
 settings = Settings()

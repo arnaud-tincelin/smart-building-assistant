@@ -7,7 +7,6 @@ current conditions, and request a bounded operation. A **Microsoft Foundry agent
 combines **Model Router**, a **Foundry IQ Knowledge Base**, and **MCP** tools.
 
 > Full demo narrative and run-sheet: [.github/instructions.md](.github/instructions.md).
-> Build plan: [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
 
 ## Architecture
 
@@ -17,17 +16,21 @@ Frontend Container App (TypeScript SPA)
             ├─ Responses API ─▶ BuildingAssist prompt agent
             │                    ├─ Model Router (Balanced)
             │                    ├─ Foundry IQ Knowledge Base MCP (Azure AI Search)
-            │                    └─ Building operations MCP (simulated telemetry)
-            └─ /mcp/ ─▶ read tools + approval-gated simulated actions
-Supporting: APIM AI Gateway tier (preview), ACR, Log Analytics + App Insights traces, Container Apps env, RBAC
+        │                    └─ AI Gateway building operations MCP
+        └─ /operations/* ─▶ simulated building REST API
+APIM AI Gateway (preview)
+  ├─ Foundry model provider ─▶ governed model endpoint
+  └─ OpenAPI ToolServer ─▶ /default/toolservers/building-operations/mcp
+Supporting: ACR, Log Analytics + App Insights traces, Container Apps env, RBAC
 SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Foundry, APIM ─▶ GitHub issues
 ```
 
-- **Backend** — Python 3.12 / FastAPI, Azure AI Projects SDK, managed identity
+- **Backend** — Python 3.14 / FastAPI, Azure AI Projects SDK, managed identity
   (`DefaultAzureCredential`). Deps via **uv**. See [src/backend](src/backend).
 - **Frontend** — TypeScript SPA (Vite + React), served by nginx. Deps via **npm**
-  through an **Azure Artifacts** feed (see `src/frontend/.npmrc`). The backend URL
-  is injected at container start (runtime `config.js`). See [src/frontend](src/frontend).
+  through the Microsoft package proxy configured in
+  [`src/frontend/.npmrc`](src/frontend/.npmrc). The backend URL is injected at
+  container start (runtime `config.js`). See [src/frontend](src/frontend).
 - **Infra** — `azd` + Bicep. Two Azure Container Apps; images built **remotely by
   ACR** (no local Docker). See [infra](infra).
 - **Knowledge** — Azure AI Search Basic hosts the GA Foundry IQ Knowledge Base;
@@ -38,7 +41,7 @@ SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Fou
 
 ## Prerequisites
 
-- The provided **`.devcontainer`** (Python 3.12 + uv, Node 22 + npm, azd, Azure CLI,
+- The provided **`.devcontainer`** (Python 3.14 + uv, Node 22 + npm, azd, Azure CLI,
   Bicep, GitHub CLI). No Docker daemon needed — ACR builds images server-side.
 - An Azure subscription and `az login` / `azd auth login`.
 - A region where Foundry Agent Service, APIM, Container Apps, and the SRE Agent are
@@ -53,20 +56,16 @@ cd src/backend
 cp .env.example .env          # BUILDINGASSIST_USE_MOCK_AGENT=true by default
 uv sync
 uv run uvicorn app.main:app --reload --port 8000
-# → http://localhost:8000/healthz, POST /ask, and MCP at /mcp/
+# → http://localhost:8000/docs, /healthz, POST /ask, and /operations/*
 ```
 
 Frontend (Vite dev server; proxies /api to the backend on :8000):
 
 ```bash
 cd src/frontend
-npm install                   # pulls deps through the Azure Artifacts feed
+npm install                   # restores through the Microsoft package proxy
 npm run dev                   # → http://localhost:5173
 ```
-
-> The feed in `src/frontend/.npmrc` requires auth. On Linux/CI use the Azure
-> Artifacts Credential Provider (or generate npm credentials in the portal) to
-> write a token into your **user-level** `~/.npmrc` — never the repo.
 
 Backend tests:
 
@@ -85,25 +84,59 @@ azd up                                # provision infra + build (ACR) + deploy b
 ```
 
 `azd up` provisions Model Router `2025-11-18` in Balanced mode, Azure AI Search,
-the Foundry IQ Knowledge Base, the MCP endpoint, the visible prompt agent, and an
-Application Insights project connection. It also outputs the app, Foundry, Search,
-Application Insights, and APIM resource details.
+the Foundry IQ Knowledge Base, the APIM-hosted MCP endpoint, the visible prompt
+agent, and the required Foundry project connections. It also outputs the app,
+Foundry, Search, Application Insights, and APIM resource details.
+
+### Continuous deployment
+
+Every push to `main`, including a merged pull request, runs
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). GitHub authenticates
+to Azure with OIDC as a user-assigned managed identity; there is no client secret.
+
+For initial setup or reconfiguration, ask Copilot to use the repository's
+[`azure-github-oidc` skill](.github/skills/azure-github-oidc/SKILL.md). The skill
+validates the target subscription and repository, previews the Bicep deployment,
+and runs its idempotent configuration helper. It can also be invoked directly:
+
+```bash
+az login
+gh auth login
+bash .github/skills/azure-github-oidc/scripts/configure.sh
+```
+
+The skill deploys [`infra/github-oidc.bicep`](infra/github-oidc.bicep) and writes the
+required non-secret Azure values to GitHub Actions variables. The workflow exchanges
+GitHub OIDC for an Azure token, runs `azd provision --preview`, deploys with `azd up`,
+and smoke-tests both application URLs.
+
+The identity has **Contributor** and **Role Based Access Control Administrator** at
+subscription scope because the application template creates a resource group and
+its role assignments. Keep this demo subscription dedicated to the environment.
 
 ### AI Gateway tier (preview)
 
 The deployment creates the native APIM **AI Gateway** SKU and its default workspace,
 then registers Model Router as a managed-identity Foundry provider. It also creates a
 gateway runtime key, applies a per-caller token limit, exports token telemetry to the
-existing Application Insights resource, and creates the connector namespace used by
-connector-backed MCP tools. Payload capture remains disabled.
+existing Application Insights resource, and keeps payload capture disabled. The same
+gateway imports the backend OpenAPI document into a workspace ToolServer and exposes
+it at `/default/toolservers/building-operations/mcp`.
 
-Existing environments get a new `aigw-*` resource alongside the former `apim-*`
-classic service; the preview tier isn't treated as an in-place SKU upgrade. Validate
-the new endpoint first, then delete the old service if nothing else uses it.
+The post-provision telemetry setup enables Application Insights OTLP ingestion,
+grants the gateway identity **Monitoring Metrics Publisher** on the generated Data
+Collection Rule, and registers a managed-identity `OpenTelemetry` exporter. Open
+**Monitoring** in the AI Gateway portal to inspect token usage by model. During this
+preview, AI Gateway exports token metrics for model traffic; MCP tool telemetry and
+distributed traces aren't exported by this path. Payload capture remains disabled.
+
+Foundry authenticates to the ToolServer with the gateway runtime key stored in the
+`buildingassist-operations` project connection. This uses the AI Gateway-specific
+`service/workspaces/toolServers` contract, not classic `service/apis` resources.
 
 The preview currently has no SLA and is limited to **East US 2** and **Sweden
-Central**. Manage additional models, MCP servers, policies, and key rotation in the
-[AI Gateway portal](https://ai.gateway.azure.com). Runtime callers use the
+Central**. Manage additional models, MCP ToolServers, policies, and runtime keys in
+the [AI Gateway portal](https://ai.gateway.azure.com). Model and MCP callers use the
 `Api-Key` header; the gateway separately uses its managed identity and **Foundry
 User** RBAC to call the model deployment.
 
@@ -132,8 +165,8 @@ project endpoint. AI Gateway model passthrough does not proxy Foundry Agent Serv
 
 The prompt agent is closed-book: every factual response requires an MCP tool call.
 Unsupported or incomplete requests return exactly `i don't know`; model knowledge is
-never used as a fallback. The operations MCP server separates portfolio discovery,
-building information, and current building data into distinct tools.
+never used as a fallback. The APIM-hosted operations MCP server separates portfolio
+discovery, building information, and current building data into distinct tools.
 
 ### Reason demo
 
@@ -194,7 +227,7 @@ infra/                     Bicep: main + modules (monitoring, registry, identity
                            apps-env, foundry, search, apim, container-app, rbac, sre-agent)
 scripts/                   postprovision hook + Foundry IQ / prompt-agent setup
 src/backend/               FastAPI service (uv)
-src/frontend/              Vite + React SPA (TypeScript, npm via Azure Artifacts)
+src/frontend/              Vite + React SPA (TypeScript, npm)
 sample-docs/               Sample building/energy docs for Foundry IQ grounding
 docs/                      Foundry agent + SRE Agent runbooks
 .devcontainer/             Dev environment (no Docker-in-Docker)
@@ -209,5 +242,5 @@ docs/                      Foundry agent + SRE Agent runbooks
 - **SRE Agent** is provisioned in Bicep (`Microsoft.App/agents`) with a scoped
   identity, Action Group, and backend metric alert; only the GitHub connector and
   incident subagent/runbook are configured post-provision (data plane).
-- **CI/CD, the Agent 365 governance plane, and the automated regression mechanic**
-  are intentionally out of scope for this scaffold (talking points in the demo).
+- **The Agent 365 governance plane and automated regression mechanic** remain demo
+  talking points rather than components of this scaffold.

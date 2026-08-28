@@ -16,8 +16,9 @@ Optional:
 - ``AZURE_AI_MODEL_DEPLOYMENT_NAME`` / ``AZURE_AI_MODEL_DEPLOYMENT`` /
   ``BUILDINGASSIST_MODEL_DEPLOYMENT`` — the model deployment the agent reasons with
     (default ``model-router``).
-- ``BUILDINGASSIST_MCP_SERVER_URL`` — public Streamable HTTP MCP endpoint; defaults
-    to ``SERVICE_BACKEND_URL`` + ``/mcp/`` when available.
+- ``BUILDINGASSIST_MCP_SERVER_URL`` — APIM-hosted Streamable HTTP MCP endpoint.
+- ``BUILDINGASSIST_MCP_CONNECTION`` — Foundry project connection that stores the
+    APIM subscription header (default ``buildingassist-operations``).
 """
 
 from __future__ import annotations
@@ -48,10 +49,9 @@ MODEL_DEPLOYMENT = (
     or os.environ.get("BUILDINGASSIST_MODEL_DEPLOYMENT")
     or "model-router"
 )
-MCP_SERVER_URL = (
-    f"{os.environ['SERVICE_BACKEND_URL'].rstrip('/')}/mcp/"
-    if os.environ.get("SERVICE_BACKEND_URL")
-    else os.environ.get("BUILDINGASSIST_MCP_SERVER_URL", "")
+MCP_SERVER_URL = os.environ.get("BUILDINGASSIST_MCP_SERVER_URL", "")
+MCP_CONNECTION = os.environ.get(
+    "BUILDINGASSIST_MCP_CONNECTION", "buildingassist-operations"
 )
 KNOWLEDGE_MCP_ENDPOINT = os.environ.get("BUILDINGASSIST_KNOWLEDGE_MCP_ENDPOINT", "")
 KNOWLEDGE_CONNECTION = os.environ.get(
@@ -107,6 +107,7 @@ def _build_tools() -> list:
                     always=MCPToolFilter(tool_names=ACTION_MCP_TOOLS),
                     never=MCPToolFilter(tool_names=READ_ONLY_MCP_TOOLS),
                 ),
+                project_connection_id=MCP_CONNECTION,
             )
         )
     else:

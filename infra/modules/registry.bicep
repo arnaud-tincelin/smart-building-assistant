@@ -16,6 +16,5 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = 
   }
 }
 
-output registryId string = registry.id
 output registryName string = registry.name
 output loginServer string = registry.properties.loginServer

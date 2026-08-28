@@ -1,0 +1,90 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+env:
+  AZURE_ENV_NAME: buildingassist-us
+  NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+
+jobs:
+  deploy:
+    name: Provision and deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Set up Azure Developer CLI
+        uses: Azure/setup-azd@v2
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Configure azd environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          azd config set auth.useAzCliAuth true
+          azd config set defaults.subscription "${{ vars.AZURE_SUBSCRIPTION_ID }}"
+          azd env select "$AZURE_ENV_NAME" || azd env new "$AZURE_ENV_NAME" --no-prompt
+          azd env set AZURE_SUBSCRIPTION_ID "${{ vars.AZURE_SUBSCRIPTION_ID }}"
+          azd env set AZURE_TENANT_ID "${{ vars.AZURE_TENANT_ID }}"
+          azd env set AZURE_LOCATION "${{ vars.AZURE_LOCATION }}"
+
+      - name: Preview infrastructure changes
+        run: azd provision --preview --no-prompt
+
+      - name: Deploy
+        run: azd up --no-prompt
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          backend_url="$(azd env get-value SERVICE_BACKEND_URL)"
+          frontend_url="$(azd env get-value SERVICE_FRONTEND_URL)"
+
+          curl --fail --silent --show-error --retry 10 --retry-all-errors \
+            --retry-delay 10 "${backend_url%/}/healthz" > /dev/null
+          curl --fail --silent --show-error --retry 10 --retry-all-errors \
+            --retry-delay 10 "${frontend_url%/}/" > /dev/null
+
+          {
+            echo '### Azure deployment'
+            echo "- Frontend: $frontend_url"
+            echo "- Backend: $backend_url"
+          } >> "$GITHUB_STEP_SUMMARY"

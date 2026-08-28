@@ -1,6 +1,6 @@
 {
   "name": "BuildingAssist Demo (azd + Bicep + Python + TypeScript)",
-  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.14-bookworm",
   "features": {
     "ghcr.io/devcontainers/features/azure-cli:1": {
       "version": "latest",

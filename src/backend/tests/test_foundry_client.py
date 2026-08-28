@@ -4,9 +4,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.agent_policy import READ_ONLY_MCP_TOOLS
 from app.config import settings
 from app.foundry_client import FoundryAgentClient
-from app.mcp_server import READ_ONLY_TOOLS
 
 
 class _FakeResponses:
@@ -80,5 +80,5 @@ def test_foundry_request_combines_foundry_iq_with_read_only_operations(
     assert knowledge_tool["allowed_tools"] == ["knowledge_base_retrieve"]
     assert knowledge_tool["headers"] == {"Authorization": "Bearer search-token"}
     assert operations_tool["server_url"] == "https://api.example.test/mcp/"
-    assert operations_tool["allowed_tools"] == READ_ONLY_TOOLS
+    assert operations_tool["allowed_tools"] == READ_ONLY_MCP_TOOLS
     assert operations_tool["require_approval"] == "never"

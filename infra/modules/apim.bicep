@@ -1,6 +1,6 @@
 metadata description = '''
 Azure API Management AI Gateway tier (preview) with a managed-identity Foundry
-provider, Model Router registration, structured token policy, and telemetry.
+provider, Model Router registration, structured token policy, and an OpenAPI ToolServer.
 '''
 
 @allowed([
@@ -32,15 +32,17 @@ param modelVersion string
 @description('Per-caller token allowance for the registered model during each minute.')
 param tokenLimitPerMinute int = 30000
 
-@description('Application Insights resource ID used for AI Gateway telemetry.')
-param appInsightsResourceId string
-
-@secure()
-@description('Application Insights connection string used by the telemetry exporter.')
-param appInsightsConnectionString string
+@description('Public base URL of the BuildingAssist backend API.')
+param backendUrl string
 
 var foundryUserRoleId = '53ca6127-db72-4b80-b1b0-d745d6d5456d'
 var normalizedFoundryEndpoint = endsWith(foundryEndpoint, '/') ? foundryEndpoint : '${foundryEndpoint}/'
+var operationsToolServerName = 'building-operations'
+var operationsOpenApi = replace(
+  loadTextContent('../api/building-operations.openapi.json'),
+  '__BACKEND_URL__',
+  backendUrl
+)
 
 resource aiGateway 'Microsoft.ApiManagement/service@2025-09-01-preview' = {
   name: apimName
@@ -84,19 +86,6 @@ resource gatewayFoundryUser 'Microsoft.Authorization/roleAssignments@2022-04-01'
     principalId: aiGateway.identity.principalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', foundryUserRoleId)
     principalType: 'ServicePrincipal'
-  }
-}
-
-resource telemetryExporter 'Microsoft.ApiManagement/service/workspaces/telemetryExporters@2025-09-01-preview' = {
-  parent: defaultWorkspace
-  name: 'appinsights'
-  properties: {
-    kind: 'applicationInsights'
-    payloadCapture: false
-    applicationInsights: {
-      connectionString: appInsightsConnectionString
-      resourceId: appInsightsResourceId
-    }
   }
 }
 
@@ -152,6 +141,33 @@ resource model 'Microsoft.ApiManagement/service/workspaces/modelProviders/models
   }
 }
 
+resource operationsToolServer 'Microsoft.ApiManagement/service/workspaces/toolServers@2025-09-01-preview' = {
+  parent: defaultWorkspace
+  name: operationsToolServerName
+  properties: {
+    type: 'mcp'
+    displayName: 'Contoso Building Operations'
+    description: 'Fictional building information, telemetry, alerts, and bounded actions.'
+    failureMode: 'failClosed'
+    endpoints: [
+      {
+        namespace: 'operations'
+        kind: 'openApi'
+        openApi: {
+          specSource: {
+            type: 'inline'
+            contentBase64: base64(operationsOpenApi)
+          }
+        }
+        credentials: {
+          type: 'none'
+        }
+        required: true
+      }
+    ]
+  }
+}
+
 resource runtimeApiKey 'Microsoft.ApiManagement/service/apiKeys@2025-09-01-preview' = {
   parent: aiGateway
   name: 'buildingassist'
@@ -160,11 +176,13 @@ resource runtimeApiKey 'Microsoft.ApiManagement/service/apiKeys@2025-09-01-previ
   }
 }
 
-output apimName string = aiGateway.name
 output apimId string = aiGateway.id
 output gatewayUrl string = aiGateway.properties.gatewayUrl
 output modelEndpoint string = '${aiGateway.properties.gatewayUrl}/default/models/openai/v1'
 output modelName string = model.name
 output runtimeApiKeyId string = runtimeApiKey.id
-output apimPrincipalId string = aiGateway.identity.principalId
 output connectorNamespaceId string = connectorNamespace.id
+output operationsMcpEndpoint string = '${aiGateway.properties.gatewayUrl}/default/toolservers/${operationsToolServerName}/mcp'
+@secure()
+#disable-next-line use-resource-symbol-reference
+output runtimeApiKey string = listSecrets(runtimeApiKey.id, '2025-09-01-preview').primaryKey

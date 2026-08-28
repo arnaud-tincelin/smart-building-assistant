@@ -6,8 +6,12 @@ set -eu
 ROOT="$(pwd)"
 export SAMPLE_DOCS_DIR="$ROOT/sample-docs"
 
-echo "==> Post-provision: Foundry IQ Knowledge Base setup"
+echo "==> Post-provision: AI Gateway telemetry setup"
 cd "$ROOT/src/backend"
+uv run python "$ROOT/scripts/setup_ai_gateway_telemetry.py"
+
+echo
+echo "==> Post-provision: Foundry IQ Knowledge Base setup"
 uv run python "$ROOT/scripts/setup_foundry_iq.py"
 
 echo

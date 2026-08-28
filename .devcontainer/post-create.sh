@@ -10,8 +10,13 @@ uv --version
 node --version
 npm --version
 
+# Managed dev containers use Microsoft's anonymous package proxy. Keep the
+# committed lockfile registry-neutral so GitHub Actions can use public npm.
+npm config set registry https://packagefeedproxy.microsoft.io/npm/
+export NPM_CONFIG_OMIT_LOCKFILE_REGISTRY_RESOLVED=true
+
 # ---- Backend (Python + uv) ----
-export UV_PYTHON=3.12
+export UV_PYTHON=3.14
 if [ -f "src/backend/pyproject.toml" ]; then
   echo "==> Backend: uv sync (src/backend)"
   (cd src/backend && uv sync)
@@ -29,6 +34,12 @@ if [ -f "src/frontend/package.json" ]; then
 else
   echo "==> Frontend: no package.json yet — skipping"
 fi
+
+# ---- Browser automation (Playwright CLI + Chromium) ----
+echo "==> Browser automation: playwright-cli"
+npm install --global @playwright/cli@latest
+playwright-cli install-browser --with-deps chromium
+playwright-cli --version
 
 echo "==> Azure toolchain"
 az version --output table || true

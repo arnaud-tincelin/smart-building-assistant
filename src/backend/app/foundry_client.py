@@ -16,8 +16,8 @@ from functools import lru_cache
 
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
+from .agent_policy import READ_ONLY_MCP_TOOLS
 from .config import settings
-from .mcp_server import READ_ONLY_TOOLS
 from .models import Citation
 
 logger = logging.getLogger("buildingassist.foundry")
@@ -102,6 +102,7 @@ class FoundryAgentClient:
             )
 
         oai = self._client()
+        kwargs: dict
         if settings.agent_name:
             kwargs = {
                 "input": question,
@@ -111,7 +112,7 @@ class FoundryAgentClient:
             }
             return self._create_response(oai, kwargs)
 
-        kwargs: dict = {
+        kwargs = {
             "model": settings.model_deployment,
             "instructions": settings.instructions,
             "input": question,
@@ -139,7 +140,7 @@ class FoundryAgentClient:
                         "Fictional current telemetry and alerts for Contoso buildings."
                     ),
                     "server_url": settings.mcp_server_url,
-                    "allowed_tools": READ_ONLY_TOOLS,
+                    "allowed_tools": READ_ONLY_MCP_TOOLS,
                     "require_approval": "never",
                 }
             )
@@ -175,7 +176,8 @@ class FoundryAgentClient:
             for content in getattr(item, "content", None) or []:
                 for ann in getattr(content, "annotations", None) or []:
                     add(
-                        getattr(ann, "filename", None) or getattr(ann, "title", None) or "",
+                        getattr(ann, "filename", None) or getattr(
+                            ann, "title", None) or "",
                         getattr(ann, "url", "") or "",
                         "",
                     )

@@ -46,15 +46,14 @@ header h1 {
   color: var(--muted);
 }
 
-.environment,
 .system-status {
   display: inline-flex;
   align-items: center;
   min-height: 30px;
   padding: 0.25rem 0.65rem;
-  border: 1px solid var(--border);
+  border: 1px solid #2f6b43;
   border-radius: 999px;
-  color: var(--muted);
+  color: #8ce99a;
   font-size: 0.82rem;
   white-space: nowrap;
 }
@@ -115,13 +114,7 @@ header h1 {
   color: var(--warning);
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0;
   text-transform: uppercase;
-}
-
-.system-status {
-  border-color: #2f6b43;
-  color: #8ce99a;
 }
 
 .ask-form {

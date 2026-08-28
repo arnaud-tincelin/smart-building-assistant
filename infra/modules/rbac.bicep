@@ -80,7 +80,6 @@ resource developerAiUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
   properties: {
     principalId: developerPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAiUserRoleId)
-    principalType: 'User'
   }
 }
 
@@ -90,7 +89,6 @@ resource developerSearchContributor 'Microsoft.Authorization/roleAssignments@202
   properties: {
     principalId: developerPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchServiceContributorRoleId)
-    principalType: 'User'
   }
 }
 
@@ -100,7 +98,6 @@ resource developerSearchDataContributor 'Microsoft.Authorization/roleAssignments
   properties: {
     principalId: developerPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataContributorRoleId)
-    principalType: 'User'
   }
 }
 
@@ -146,6 +143,5 @@ resource developerTraceReaders 'Microsoft.Authorization/roleAssignments@2022-04-
   properties: {
     principalId: developerPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleId)
-    principalType: 'User'
   }
 }]

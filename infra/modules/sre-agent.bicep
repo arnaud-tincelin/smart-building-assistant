@@ -223,7 +223,6 @@ resource sreAgentAdministratorAssignment 'Microsoft.Authorization/roleAssignment
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', sreAgentAdministratorRoleId)
     principalId: developerPrincipalId
-    principalType: 'User'
   }
 }
 
@@ -274,5 +273,3 @@ resource backendErrorAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
 }
 
 output agentName string = sreAgent.name
-output agentId string = sreAgent.id
-output identityPrincipalId string = identity.properties.principalId

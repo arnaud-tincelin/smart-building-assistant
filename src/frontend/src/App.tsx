@@ -9,7 +9,7 @@ import {
 } from "./api";
 
 const SAMPLE_QUESTION =
-  "Why is Paris HQ Floor 3 energy-sensitive, and what is happening there now?";
+  "Why is Floor 3 energy-sensitive, and what is happening there now?";
 
 type View = "assistant" | "security";
 type AccessMethod = "badge" | "mobile";
@@ -35,6 +35,7 @@ export function App() {
   const [accessMethod, setAccessMethod] = useState<AccessMethod>("badge");
   const [accessState, setAccessState] = useState<OperationState>(EMPTY_OPERATION);
   const [visitorState, setVisitorState] = useState<OperationState>(EMPTY_OPERATION);
+  const credentialId = accessMethod === "badge" ? "BDG-1042" : "MOB-2048";
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -57,7 +58,7 @@ export function App() {
       const accessResult = await requestAccess({
         building_id: "paris-hq",
         access_point_id: "main-lobby",
-        credential_id: accessMethod === "badge" ? "BDG-1042" : "MOB-2048",
+        credential_id: credentialId,
         method: accessMethod,
       });
       setAccessState({ loading: false, error: null, result: accessResult });
@@ -121,7 +122,6 @@ export function App() {
           <h1>BuildingAssist</h1>
           <p className="subtitle">Contoso Energy · Smart Building operations</p>
         </div>
-        <span className="environment">Paris HQ</span>
       </header>
 
       <nav className="view-tabs" aria-label="BuildingAssist views">
@@ -232,13 +232,13 @@ export function App() {
               <label>
                 Credential
                 <input
-                  value={accessMethod === "badge" ? "BDG-1042" : "MOB-2048"}
+                  value={credentialId}
                   readOnly
                 />
               </label>
               <label>
                 Access point
-                <input value="Main lobby · Paris HQ" readOnly />
+                <input value="Main lobby" readOnly />
               </label>
               <button className="primary-action" type="submit" disabled={accessState.loading}>
                 {accessState.loading ? "Validating…" : "Request access"}

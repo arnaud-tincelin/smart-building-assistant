@@ -1,7 +1,7 @@
 # BuildingAssist frontend — nginx serving the pre-built Vite/TypeScript bundle.
-# The bundle is produced on the host (npm run build via the Azure Artifacts feed)
-# and copied in here, so the ACR image build needs no npm/registry access. The
-# backend URL is injected at container start from the BACKEND_URL env var.
+# The bundle is produced on the host with npm through the configured package
+# proxy and copied in here, so the ACR image build needs no registry access.
+# The backend URL is injected at container start from the BACKEND_URL env var.
 FROM nginx:1.27-alpine
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf

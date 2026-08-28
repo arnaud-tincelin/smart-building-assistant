@@ -1,20 +1,20 @@
-"""BuildingAssist API with chat and simulated operations over MCP."""
+"""BuildingAssist API with chat and simulated building operations."""
 
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import Callable
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from .building_operations import operations
 from .config import settings
 from .foundry_client import get_client
-from .mcp_server import mcp_http_app, mcp_server
 from .models import AccessRequest, AskRequest, AskResponse, VisitorCheckInRequest
+from .operations_api import router as operations_router
 from .telemetry import configure_tracing
 
 logging.basicConfig(level=logging.INFO)
@@ -23,17 +23,10 @@ security_logger = logging.getLogger("buildingassist.security")
 configure_tracing()
 
 
-@asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    async with mcp_server.session_manager.run():
-        yield
-
-
 app = FastAPI(
     title="BuildingAssist",
     version="0.1.0",
     summary="A minimal Smart Building assistant backed by an Azure AI Foundry agent.",
-    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -44,7 +37,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/mcp", mcp_http_app, name="building-operations-mcp")
+app.include_router(operations_router)
+
+
+@app.exception_handler(ValueError)
+async def _invalid_request(_request: Request, exc: ValueError) -> JSONResponse:
+    # The operations simulator raises ValueError for invalid inputs; surface them as 400s.
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.get("/healthz")
@@ -90,49 +89,46 @@ def _security_failure(
     )
 
 
+def _run_security_operation(operation: str, call: Callable[[], dict], **context: str) -> dict:
+    incident_id = f"SEC-{uuid4().hex[:12].upper()}"
+    try:
+        return call()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise _security_failure(operation, incident_id,
+                                exc, **context) from exc
+
+
 @app.post("/security/access-requests")
 def request_access(request: AccessRequest) -> dict:
     """Evaluate a simulated badge or mobile building-access request."""
-    incident_id = f"SEC-{uuid4().hex[:12].upper()}"
-    try:
-        return operations.request_access(
+    return _run_security_operation(
+        "access_request",
+        lambda: operations.request_access(
             request.building_id,
             request.access_point_id,
             request.credential_id,
             request.method,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise _security_failure(
-            "access_request",
-            incident_id,
-            exc,
-            building_id=request.building_id,
-            access_point_id=request.access_point_id,
-        ) from exc
+        ),
+        building_id=request.building_id,
+        access_point_id=request.access_point_id,
+    )
 
 
 @app.post("/security/visitors/check-in")
 def check_in_visitor(request: VisitorCheckInRequest) -> dict:
     """Check a visitor into a simulated building and issue a temporary pass."""
-    incident_id = f"SEC-{uuid4().hex[:12].upper()}"
-    try:
-        return operations.check_in_visitor(
+    return _run_security_operation(
+        "visitor_check_in",
+        lambda: operations.check_in_visitor(
             request.building_id,
             request.access_point_id,
             request.visitor_name,
             request.visitor_email,
             request.host_name,
             request.purpose,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise _security_failure(
-            "visitor_check_in",
-            incident_id,
-            exc,
-            building_id=request.building_id,
-            access_point_id=request.access_point_id,
-        ) from exc
+        ),
+        building_id=request.building_id,
+        access_point_id=request.access_point_id,
+    )
