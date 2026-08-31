@@ -156,8 +156,17 @@ def _configure_exporter(
         AI_GATEWAY_API_VERSION,
         allow_not_found=True,
     )
-    existing_kind = existing.get("properties", {}).get("kind", "")
-    if existing and existing_kind.lower() != "opentelemetry":
+    existing_properties = existing.get("properties", {})
+    existing_kind = existing_properties.get("kind", "")
+    existing_open_telemetry = existing_properties.get("openTelemetry", {})
+    # The preview API projects this legacy alias even for canonical credentials,
+    # then rejects in-place updates that mix the two representations.
+    uses_legacy_credentials = any(
+        name in existing_open_telemetry for name in ("headers", "managedIdentity")
+    )
+    if existing and (
+        existing_kind.lower() != "opentelemetry" or uses_legacy_credentials
+    ):
         _arm_request(
             token,
             "DELETE",
@@ -180,7 +189,9 @@ def _configure_exporter(
                     "metricsEndpoint": otlp["OTLPMetricsEndpoint"],
                     "logsEndpoint": otlp["OTLPLogsEndpoint"],
                     "tracesEndpoint": otlp["OTLPTracesEndpoint"],
-                    "managedIdentity": {"resource": OTLP_AUDIENCE},
+                    "credentials": {
+                        "managedIdentity": {"resource": OTLP_AUDIENCE}
+                    },
                 },
             }
         },
