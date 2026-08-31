@@ -195,7 +195,12 @@
                     "type": "string"
                   },
                   "confirmed": {
-                    "type": "boolean"
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "default": "false"
                   }
                 }
               }

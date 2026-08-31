@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>A Developer's Day on the Microsoft Agentic Platform — Contoso Energy</title>
+<title>From Spec to Prod — Azure Agentic Platform Workshop</title>
 <style>
   :root{
     --azure:#0078d4; --copilot:#2563eb; --foundry:#10b981; --sre:#f59e0b;
@@ -155,6 +155,201 @@
   .navbtn:disabled{opacity:.4;cursor:not-allowed}
   .tip{font-size:11.5px;color:var(--muted)}
   .kbd{font-family:ui-monospace,monospace;font-size:11px;border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:1px 5px;background:#f8fafc}
+</style>
+<style>
+  :root{
+    --ws-ink:#101820;--ws-paper:#f4f7f8;--ws-white:#fff;--ws-line:#d9e0e3;
+    --ws-azure:#0078d4;--ws-github:#24292f;--ws-foundry:#008f7a;--ws-sre:#e86a17;
+    --ws-lime:#c9f269;--ws-muted:#5f6b73;--ws-shadow:0 18px 50px rgba(16,24,32,.12);
+  }
+  body > .topbar,body > .stepper,body > .stage,body > .foot{display:none}
+  #workshop{min-height:100vh;background:var(--ws-paper);color:var(--ws-ink);font-family:Aptos,"Segoe UI",sans-serif}
+  .ws-top{height:64px;display:flex;align-items:center;padding:0 28px;background:var(--ws-ink);color:#fff;border-bottom:4px solid var(--ws-lime)}
+  .ws-brand{display:flex;align-items:center;gap:12px;font-family:Bahnschrift,Aptos,sans-serif;font-weight:700}
+  .ws-mark{display:grid;grid-template-columns:repeat(2,9px);grid-template-rows:repeat(2,9px);gap:2px}
+  .ws-mark i:nth-child(1){background:#f25022}.ws-mark i:nth-child(2){background:#7fba00}.ws-mark i:nth-child(3){background:#00a4ef}.ws-mark i:nth-child(4){background:#ffb900}
+  .ws-brand small{font-weight:400;color:#b9c3c9}
+  .ws-top-meta{margin-left:auto;text-align:right;font-size:11px;color:#b9c3c9;line-height:1.35}
+  .ws-progress{display:flex;align-items:center;gap:6px;padding:10px 28px;background:#fff;border-bottom:1px solid var(--ws-line);overflow-x:auto;position:sticky;top:0;z-index:10}
+  .ws-step{height:34px;display:flex;align-items:center;gap:7px;border:0;border-bottom:3px solid transparent;background:transparent;color:var(--ws-muted);font-weight:700;font-size:11px;padding:0 10px;white-space:nowrap;cursor:pointer}
+  .ws-step b{width:20px;height:20px;display:grid;place-items:center;border:1px solid #bac4c9;border-radius:50%;font-size:10px}
+  .ws-step.active{color:var(--ws-azure);border-bottom-color:var(--ws-azure)}
+  .ws-step.active b{background:var(--ws-azure);border-color:var(--ws-azure);color:#fff}
+  .ws-step.done b{background:var(--ws-ink);border-color:var(--ws-ink);color:#fff}
+  .ws-main{max-width:1240px;margin:0 auto;padding:28px 28px 108px}
+  .ws-scene{display:none;animation:ws-in .3s ease-out}.ws-scene.active{display:block}
+  @keyframes ws-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .ws-kicker{display:flex;align-items:center;gap:9px;color:var(--ws-azure);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px}
+  .ws-kicker:before{content:"";width:30px;height:4px;background:currentColor}
+  .ws-title{max-width:900px;margin:10px 0 6px;font-family:Bahnschrift,Aptos,sans-serif;font-size:clamp(30px,4vw,54px);line-height:1.02;letter-spacing:0}
+  .ws-sub{max-width:880px;margin:0 0 24px;color:var(--ws-muted);font-size:16px}
+  .ws-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.72fr);gap:18px;align-items:start}
+  .ws-surface,.ws-guide{background:#fff;border:1px solid var(--ws-line);box-shadow:var(--ws-shadow)}
+  .ws-surface{min-height:480px}.ws-windowbar{height:38px;display:flex;align-items:center;gap:8px;padding:0 13px;background:#e9eef0;border-bottom:1px solid var(--ws-line);font-size:11px;font-weight:700;color:#56636a}
+  .ws-windowbar i{width:9px;height:9px;border-radius:50%;background:#bdc7cb}.ws-windowbar strong{margin-left:5px;color:var(--ws-ink)}
+  .ws-canvas{padding:20px}.ws-guide{padding:18px;border-top:5px solid var(--accent,var(--ws-azure))}
+  .ws-guide h3{font-family:Bahnschrift,Aptos,sans-serif;font-size:18px;margin:0 0 12px}
+  .ws-guide-block{padding:12px 0;border-top:1px solid var(--ws-line)}.ws-guide-block:first-of-type{border-top:0}
+  .ws-guide-label{font-size:10px;font-weight:900;color:var(--accent,var(--ws-azure));text-transform:uppercase;letter-spacing:1px;margin-bottom:5px}
+  .ws-guide p,.ws-guide li{font-size:12.5px;line-height:1.45}.ws-guide p{margin:0}.ws-guide ul{margin:0;padding-left:17px}
+  .ws-time{display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;padding:5px 8px;background:#eef4f7;font-size:11px;font-weight:800}
+  .ws-talk{background:var(--ws-ink);color:#fff;padding:12px 13px;font-style:italic;font-size:13px;line-height:1.45}
+  .ws-handoff{background:#eef9d8;border-left:4px solid #83a92d;padding:10px 11px;font-size:12px;font-weight:700}
+  .ws-chips{display:flex;flex-wrap:wrap;gap:6px}.ws-chip{display:inline-flex;align-items:center;padding:5px 8px;background:#eef4f7;font-size:10px;font-weight:800;color:#40505a}
+  .ws-product-image{width:52px;height:52px;object-fit:contain;filter:drop-shadow(0 8px 14px rgba(0,0,0,.25))}
+  .ws-cap-label{margin:16px 0 8px;color:var(--accent);font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1px}
+  .ws-cap-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+  .ws-cap-grid.foundry-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ws-cap-grid.sre-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .foundry-grid .ws-cap,.sre-grid .ws-cap{min-height:98px}
+  .ws-cap{min-height:112px;padding:14px;border:1px solid #29394d;border-radius:8px;background:#152438;display:flex;flex-direction:column;justify-content:space-between}
+  .ws-cap.primary{border-top:4px solid var(--accent);background:#172a42}.ws-cap.awesome{border-color:#5d86b3;box-shadow:inset 0 0 0 1px rgba(110,200,255,.2)}
+  .ws-cap-icon{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;background:#243b57;color:#8fd3ff;font:900 13px/1 ui-monospace,monospace}
+  .ws-cap-icon img{width:23px;height:23px;object-fit:contain}.ws-cap b{display:block;margin-top:12px;color:#f8fafc;font-size:14px}.ws-cap small{display:block;margin-top:3px;color:#9aabba;font-size:10.5px;line-height:1.25}
+  .copilot-grid .ws-cap:not(.awesome) .ws-cap-icon img{width:24px;height:24px;filter:invert(77%) sepia(15%) saturate(1399%) hue-rotate(169deg) brightness(105%) contrast(101%)}
+  .foundry-grid .ws-cap-icon img{width:28px;height:28px}
+  .sre-grid .ws-cap-icon img{width:24px;height:24px}
+  .ws-cap-link{color:inherit;text-decoration:none}.ws-cap-link:hover b,.ws-cap-link:focus-visible b{color:#6ec8ff;text-decoration:underline}
+  .ws-cap-arrow{text-align:center;color:#6ec8ff;font-size:22px;line-height:1;margin:9px 0}
+  .ws-command-strip{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(240px,.7fr);gap:10px;margin-top:14px}
+  .ws-command-strip.single{grid-template-columns:1fr}
+  .ws-command-strip code,.ws-outcome{padding:11px 13px;border-radius:8px}.ws-command-strip code{background:#0a1523;color:#c9f269;font-size:11px;overflow:auto}.ws-outcome{background:#113529;color:#86efac;font-size:11px;font-weight:800}
+  .ws-flowline{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:16px}.ws-flowline span{padding:8px 12px;border-radius:8px;background:#172a42;color:#d8e2ea;font-size:11px;font-weight:800}.ws-flowline i{color:#6ec8ff;font-style:normal;font-size:18px}
+  .ws-product{display:flex;align-items:center;gap:12px;margin-bottom:18px}.ws-product-logo{width:48px;height:48px;display:grid;place-items:center;background:var(--accent);color:#fff;font-family:Bahnschrift,sans-serif;font-size:16px;font-weight:900}
+  .ws-product h2{margin:0;font-family:Bahnschrift,Aptos,sans-serif;font-size:20px}.ws-product p{margin:2px 0 0;color:var(--ws-muted);font-size:12px}
+  .ws-code{background:#111820;color:#dce8ed;padding:16px;font:12px/1.55 "Cascadia Code",Consolas,monospace;overflow:auto}.ws-code .cmd{color:#c9f269}.ws-code .dim{color:#82929b}.ws-code .blue{color:#6ec8ff}.ws-code .green{color:#73e0bd}
+  .ws-chat{border:1px solid var(--ws-line)}.ws-chat-head{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#eef4f7;font-size:11px;font-weight:800}.ws-chat-body{padding:12px}
+  .ws-bubble{max-width:88%;padding:10px 12px;margin:7px 0;background:#edf1f3;font-size:12.5px}.ws-bubble.user{margin-left:auto;background:#e2f1ff}.ws-bubble.good{border-left:4px solid #2ea66f;background:#eaf8f1}
+  .ws-list{border:1px solid var(--ws-line)}.ws-row{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:10px 12px;border-top:1px solid var(--ws-line);font-size:12px}.ws-row:first-child{border-top:0}.ws-row b{color:var(--ws-muted)}
+  .ws-status{display:inline-block;padding:3px 7px;background:#eaf8f1;color:#08734b;font-size:10px;font-weight:900}
+  .ws-alert{border:1px solid #f1b995}.ws-alert-head{padding:9px 12px;background:#fff0e6;color:#a34209;font-size:11px;font-weight:900}.ws-alert-body{padding:13px;font-size:12.5px}
+  .ws-rca{margin:10px 0;padding:11px;background:#f1f4f5;border-left:4px solid var(--ws-sre)}
+  .ws-diff{background:#111820;color:#dce8ed;padding:13px;font:12px/1.6 "Cascadia Code",Consolas,monospace}.ws-del{color:#ff9c9c}.ws-add{color:#83e6aa}
+  .ws-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.ws-action{border:0;padding:9px 12px;background:var(--accent);color:#fff;font-weight:800;font-size:11px;cursor:pointer}.ws-action.secondary{background:#e7ecee;color:var(--ws-ink)}
+  .ws-overview{background:var(--ws-ink);color:#fff;border:0;box-shadow:var(--ws-shadow);padding:24px;min-height:520px;position:relative;overflow:hidden}
+  .ws-overview:after{content:"";position:absolute;right:-80px;top:-100px;width:280px;height:280px;border:42px solid rgba(201,242,105,.12);border-radius:50%}
+  .ws-journey{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;position:relative;z-index:1}.ws-journey-card{min-height:112px;padding:14px;background:#192630;border-top:5px solid var(--accent)}
+  .ws-journey-card .num{font-size:10px;color:#9fadb5;font-weight:900}.ws-journey-card h3{font-size:16px;margin:15px 0 3px}.ws-journey-card p{margin:0;color:#b9c5cb;font-size:11px}
+  .ws-platform{margin-top:16px;display:grid;grid-template-columns:1fr auto 1.25fr auto 1fr;align-items:stretch;gap:8px;position:relative;z-index:1}.ws-platform-box{padding:14px;background:#fff;color:var(--ws-ink)}
+  .ws-platform-box b{display:block;font-size:14px}.ws-platform-box span{font-size:10.5px;color:#607078}.ws-platform-arrow{display:grid;place-items:center;color:var(--ws-lime);font-size:24px}
+  .ws-runtime{margin-top:8px;padding:11px 14px;background:#263641;border-left:5px solid var(--ws-lime);position:relative;z-index:1;font-size:11px;color:#d8e3e8}.ws-runtime b{color:#fff}
+  .ws-principle{position:relative;z-index:1;margin-top:18px;font-family:Bahnschrift,Aptos,sans-serif;font-size:20px;max-width:840px;line-height:1.3}
+  .ws-footer{position:fixed;z-index:20;left:0;right:0;bottom:0;min-height:64px;display:flex;align-items:center;gap:14px;padding:10px 28px;background:#fff;border-top:1px solid var(--ws-line)}
+  .ws-count{font-size:11px;font-weight:900;color:var(--ws-muted)}.ws-footer-note{font-size:11px;color:#7a878e}.ws-footer-space{flex:1}
+  .ws-nav{width:38px;height:38px;border:1px solid var(--ws-line);background:#fff;color:var(--ws-ink);font-size:18px;cursor:pointer}.ws-nav.next{background:var(--ws-ink);color:#fff;border-color:var(--ws-ink)}.ws-nav:disabled{opacity:.3;cursor:not-allowed}
+  @media(max-width:900px){.ws-layout{grid-template-columns:1fr}.ws-journey{grid-template-columns:repeat(2,1fr)}.ws-platform{grid-template-columns:1fr}.ws-platform-arrow{transform:rotate(90deg)}.ws-top-meta{display:none}.ws-main{padding:20px 16px 100px}.ws-progress{padding:8px 12px}.ws-surface{min-height:0}.ws-cap-grid,.ws-cap-grid.sre-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ws-command-strip{grid-template-columns:1fr}}
+  @media(max-width:560px){.ws-top{padding:0 16px}.ws-brand small{display:none}.ws-journey{grid-template-columns:1fr}.ws-title{font-size:31px}.ws-row{grid-template-columns:1fr;gap:3px}.ws-footer-note{display:none}.ws-main{padding-left:12px;padding-right:12px}.ws-canvas{padding:14px}.ws-cap-grid{grid-template-columns:1fr 1fr}.ws-cap{min-height:104px;padding:11px}}
+
+  /* Original storyboard theme */
+  :root{
+    --ws-ink:#0b1220;--ws-paper:#eef2f9;--ws-line:#e2e8f0;
+    --ws-lime:#93c5fd;--ws-muted:#64748b;--ws-shadow:0 10px 30px rgba(15,23,42,.10);
+  }
+  #workshop{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .ws-top{height:48px;padding:0 22px;background:#fff;color:var(--ws-ink);border-bottom:1px solid var(--ws-line)}
+  .ws-brand{font-family:inherit;letter-spacing:.2px}.ws-brand small,.ws-top-meta{color:var(--ws-muted)}
+  .ws-progress{gap:8px;padding:13px 22px;top:0}
+  .ws-step{height:32px;padding:0 12px;border:1px solid var(--ws-line);border-radius:999px;background:#fff;color:var(--ws-muted);transition:.18s}
+  .ws-step b{width:9px;height:9px;border:0;background:#cbd5e1;color:transparent}
+  .ws-step:hover{border-color:#cbd5e1}.ws-step.active{color:#fff;border-color:transparent;border-bottom-color:transparent;background:#0078d4}
+  .ws-step:nth-child(3).active{background:#24292f}.ws-step:nth-child(4).active{background:#2563eb}
+  .ws-step:nth-child(5).active{background:#10b981}.ws-step:nth-child(6).active,.ws-step:nth-child(7).active{background:#f59e0b}
+  .ws-step:nth-child(8).active{background:#7c3aed}
+  .ws-step.active b{width:9px;height:9px;background:rgba(255,255,255,.9);color:transparent}.ws-step.done b{width:9px;height:9px;background:#16a34a;color:transparent}
+  .ws-main{max-width:1120px;padding-top:26px}
+  .ws-kicker:before{height:3px}.ws-title{font-family:inherit;font-size:clamp(28px,3vw,38px);line-height:1.12;font-weight:800;margin-top:7px}
+  .ws-sub{font-size:15px;margin-bottom:20px}
+  .ws-layout{display:block}
+  .ws-surface,.ws-guide{border-radius:12px;overflow:hidden}.ws-guide{border-top:1px solid var(--ws-line);padding:16px}
+  .ws-guide:before{content:"";display:block;width:42px;height:4px;border-radius:4px;background:var(--accent);margin-bottom:12px}
+  .ws-guide h3,.ws-product h2{font-family:inherit}.ws-time,.ws-chip{border-radius:999px}.ws-talk{border-radius:8px;background:#f8fafc;color:var(--ws-ink);border-left:3px solid var(--accent)}
+  .ws-handoff{border-radius:8px;background:#f8fafc;border:1px dashed var(--ws-line);border-left:3px solid var(--accent);color:var(--ws-muted)}
+  .ws-product-logo{border-radius:9px}.ws-code,.ws-chat,.ws-list,.ws-alert,.ws-diff{border-radius:9px;overflow:hidden}.ws-bubble{border-radius:9px}.ws-action{border-radius:9px}
+  .ws-overview{min-height:500px;padding:34px;background:linear-gradient(135deg,#0b1220 0%,#15233f 60%,#1b3a6b 100%);border-radius:18px}
+  .ws-overview:after{display:none}.ws-journey{gap:10px}.ws-journey-card{min-height:108px;border-top:0;border-radius:11px;background:var(--accent);color:#fff}
+  .ws-journey-card .num,.ws-journey-card p{color:rgba(255,255,255,.82)}.ws-journey-card h3{margin-top:13px}
+  .ws-platform-box{border-radius:10px}.ws-platform-arrow{color:#93c5fd}.ws-runtime{border-radius:10px;background:#15233f;border:1px dashed #3b82f6;border-left:3px solid #3b82f6}
+  .ws-principle{font-family:inherit;font-size:18px;font-style:italic;border-left:3px solid #3b82f6;padding-left:14px;color:#e2e8f0}
+  .ws-footer{min-height:62px;padding:10px 22px}.ws-nav{border-radius:9px}.ws-nav.next{background:var(--ws-azure);border-color:var(--ws-azure)}
+  @media(max-width:900px){.ws-layout{grid-template-columns:1fr}.ws-progress{padding:10px 12px}.ws-overview{padding:22px}}
+
+  /* Dark presentation theme */
+  :root{
+    --ws-ink:#f8fafc;--ws-paper:#07111f;--ws-white:#101d2d;--ws-line:#29394d;
+    --ws-muted:#9aabba;--ws-shadow:0 16px 40px rgba(0,0,0,.32);
+  }
+  #workshop{background:radial-gradient(circle at 80% 0%,#162d4c 0,transparent 34%),#07111f;color:var(--ws-ink)}
+  .ws-top{background:#0b1625;color:#fff;border-bottom-color:#29394d}
+  .ws-brand small,.ws-top-meta{color:#9aabba}
+  .ws-progress{background:#0b1625;border-bottom-color:#29394d}
+  .ws-step{background:#101d2d;border-color:#29394d;color:#9aabba}
+  .ws-step:hover{border-color:#53687c;color:#e2e8f0}
+  .ws-step.done{color:#cbd5e1}.ws-step.done b{background:#16a34a}
+  .ws-title{color:#f8fafc}.ws-sub{color:#9aabba}
+  .ws-surface,.ws-guide{background:#101d2d;border-color:#29394d;box-shadow:var(--ws-shadow)}
+  .ws-windowbar{background:#152438;border-bottom-color:#29394d;color:#9aabba}.ws-windowbar strong{color:#e2e8f0}
+  .ws-guide-block{border-top-color:#29394d}.ws-guide p,.ws-guide li{color:#cbd5e1}
+  .ws-time,.ws-chip{background:#1a2a3d;color:#b8c5d1}
+  .ws-talk{background:#0a1523;color:#e2e8f0;border-left-color:var(--accent)}
+  .ws-handoff{background:#0a1523;border-color:#35475a;border-left-color:var(--accent);color:#b8c5d1}
+  .ws-product h2{color:#f8fafc}.ws-product p{color:#9aabba}
+  .ws-chat,.ws-list,.ws-alert{border-color:#29394d}.ws-chat-head{background:#17273a;color:#d8e2ea}
+  .ws-bubble{background:#1a2a3d;color:#d8e2ea}.ws-bubble.user{background:#12365a;color:#e6f3ff}.ws-bubble.good{background:#113529;color:#b9f6d8;border-left-color:#2ea66f}
+  .ws-row{border-top-color:#29394d;color:#d8e2ea}.ws-row b{color:#9aabba}
+  .ws-status{background:#12392b;color:#86efac}
+  .ws-alert{background:#0e1928}.ws-alert-head{background:#402517;color:#ffc69f}.ws-alert-body{color:#d8e2ea}
+  .ws-rca{background:#17273a;color:#d8e2ea}
+  .ws-action.secondary{background:#243448;color:#e2e8f0}
+  .ws-overview{background:linear-gradient(135deg,#0b1220 0%,#15233f 60%,#1b3a6b 100%);border:1px solid #29456f}
+  .ws-platform-box{background:#101d2d;color:#f8fafc;border:1px solid #29394d}.ws-platform-box span{color:#9aabba}
+  .ws-runtime{background:#101d2d;border-color:#3b82f6;color:#cbd5e1}
+  .ws-footer{background:#0b1625;border-top-color:#29394d}.ws-count,.ws-footer-note{color:#9aabba}
+  .ws-nav{background:#101d2d;border-color:#35475a;color:#f8fafc}.ws-nav.next{background:#0078d4;border-color:#0078d4}.ws-nav:disabled{opacity:.35}
+
+  /* Introduction: Evolving DevOps */
+  .evolution{position:relative;margin-top:24px;padding-top:58px}
+  .evolution:before{content:"";position:absolute;left:-28px;right:-28px;top:18px;height:3px;background:#2f9e44}
+  .evolution-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+  .evolution-era{position:relative;padding-top:42px}
+  .evolution-era:before{content:"";position:absolute;left:50%;top:-49px;width:24px;height:24px;border:8px solid #17212b;border-radius:50%;background:#2f9e44;box-shadow:0 0 16px rgba(47,158,68,.22);transform:translateX(-50%)}
+  .evolution-era:after{content:"";position:absolute;left:50%;top:-17px;width:1px;height:59px;background:#2b3a48}
+  .evolution-card{position:relative;z-index:1;min-height:270px;padding:18px;background:#17212b;border:1px solid #2b3a48;border-radius:8px;text-align:center}
+  .evolution-card h2{margin:0 0 24px;padding:10px;background:#1d2934;border-top:4px solid #2f9e44;color:#e9edf1;border-radius:8px;font-size:26px}
+  .evolution-card p{margin:0;color:#e9edf1;font-size:19px;line-height:1.35}
+  .evolution-card strong{color:#8ce99a}
+
+  /* Slide 7: Platform lifecycle */
+  .lifecycle{--flow:#2f9e44;position:relative;padding:20px 22px 12px;border:1px solid #2b3a48;border-left:4px solid var(--flow);border-radius:8px;background:#0f1720;box-shadow:var(--ws-shadow)}
+  .lifecycle-grid{display:grid;grid-template-columns:minmax(160px,.8fr) 64px minmax(390px,2fr) 64px minmax(180px,.9fr);align-items:stretch}
+  .life-area{display:grid;grid-template-rows:400px auto;min-width:0}
+  .life-zone{padding:20px 16px;border:1px solid #2b3a48;border-radius:8px;background:#17212b;box-shadow:0 12px 28px rgba(7,11,28,.22)}
+  .life-zone-title{padding-top:12px;text-align:center;color:#f5b942;font-size:26px;font-weight:850;line-height:1}
+  .life-node{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-width:0;color:#e9edf1;text-align:center;font-size:13px;font-weight:750;line-height:1.15}
+  .life-node img{display:block;width:50px;height:50px;object-fit:contain;filter:drop-shadow(0 7px 10px rgba(0,0,0,.22))}
+  .life-node img.wide{width:56px}.life-node img.copilot-product{width:58px;height:52px}.life-node img.azure-service{width:42px;height:42px}
+  .actions-mark{position:relative;width:50px;height:50px;border:4px solid #fff;border-radius:50%;filter:drop-shadow(0 7px 10px rgba(0,0,0,.22))}
+  .actions-mark:after{content:"";position:absolute;left:50%;top:50%;transform:translate(-38%,-50%);border-top:11px solid transparent;border-bottom:11px solid transparent;border-left:16px solid #fff}
+  .life-stack{height:100%;display:grid;grid-template-rows:1fr 24px 1fr 24px 1fr;align-items:center;justify-items:center}
+  .life-plus{color:#4dabf7;font-size:36px;font-weight:700;line-height:1}
+  .life-build{height:100%;display:grid;grid-template-columns:minmax(120px,1fr) 74px minmax(120px,1fr);grid-template-rows:minmax(0,1fr) 48px minmax(0,1fr);align-items:center;justify-items:center}
+  .life-agent{gap:4px;transform:translateY(-5px)}.life-agent .agent-combo{display:flex;flex-direction:column;align-items:center;gap:5px}.life-agent .agent-combo span{font-size:11px;line-height:1.1;text-align:center;white-space:nowrap}.life-agent .agent-combo img{width:50px;height:50px}.life-agent .mini-plus{color:#4dabf7;font-size:32px;font-weight:700;line-height:1}
+  .flow-h{position:relative;width:100%;height:3px;border-radius:3px;background:var(--flow);box-shadow:0 0 10px rgba(47,158,68,.18)}
+  .flow-h:after{content:"";position:absolute;right:-1px;top:50%;transform:translateY(-50%);border-top:8px solid transparent;border-bottom:8px solid transparent;border-left:10px solid var(--flow)}
+  .flow-h.bi:before{content:"";position:absolute;left:-1px;top:50%;transform:translateY(-50%);border-top:8px solid transparent;border-bottom:8px solid transparent;border-right:10px solid var(--flow)}
+  .flow-v{position:relative;width:3px;height:100%;border-radius:3px;background:var(--flow);box-shadow:0 0 10px rgba(47,158,68,.18)}
+  .flow-v:after{content:"";position:absolute;left:50%;bottom:-1px;transform:translateX(-50%);border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid var(--flow)}
+  .flow-v.bi:before{content:"";position:absolute;left:50%;top:-1px;transform:translateX(-50%);border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:10px solid var(--flow)}
+  .life-build .issues-flow{justify-self:start;width:calc(100% + 38px);transform:translateY(-11px)}
+  .life-build .actions-flow{justify-self:start;width:calc(100% + 86px);margin-left:-48px;transform:translateY(-6px)}
+  .life-build .repos-node,.life-build .actions-node{transform:translateY(5px)}
+  .life-build .repos-flow{align-self:start;height:calc(100% - 19px);margin-top:35px}
+  .life-bridge{height:400px;display:grid;grid-template-rows:1fr 48px 1fr;align-items:center;padding:0 6px}.life-bridge .upper{grid-row:1}.life-bridge .lower{grid-row:3}
+  @media(min-width:901px){.repo-bridge .flow-h{width:calc(100% + 61px);transform:translateY(-17px)}.operate-bridge .issues-flow{width:calc(100% + 60px);margin-left:-60px;transform:translateY(-1px)}.operate-bridge .actions-flow{width:calc(100% + 71px);margin-left:-71px;transform:translateY(-17px)}}
+  .life-operate{height:100%;display:grid;grid-template-columns:1fr 34px 1fr;grid-template-rows:1fr 56px .75fr;align-items:center;justify-items:center;gap:0 4px}
+  .life-operate .sre{grid-column:1;grid-row:1}.life-operate .foundry{grid-column:3;grid-row:1}.life-operate .azure-link{grid-column:1/4;grid-row:2}.life-operate .azure-platform{grid-column:1/4;grid-row:3;color:#fff;font-size:14px;font-weight:800}.life-operate .azure-platform img{width:46px;height:46px}
+  .life-operate .life-node{font-size:12px}.life-operate .life-node img{width:54px;height:54px}
+  .lifecycle-note{display:flex;justify-content:space-between;gap:16px;margin-top:9px;color:#9aa7b2;font-size:10px}.lifecycle-note strong{color:#e9edf1}
+  @media(max-width:900px){.evolution{padding-top:0}.evolution:before{display:none}.evolution-grid{grid-template-columns:1fr}.evolution-era{padding-top:0}.evolution-era:before,.evolution-era:after{display:none}.evolution-card{min-height:0}.lifecycle-grid{grid-template-columns:1fr}.life-area{grid-template-rows:auto auto}.life-zone{min-height:300px}.life-bridge{height:56px;display:flex;justify-content:center;padding:13px}.life-bridge .flow-h{width:3px;height:30px}.life-bridge .flow-h:after{right:auto;left:50%;top:auto;bottom:-1px;transform:translateX(-50%);border:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid var(--flow)}.life-bridge .flow-h.bi:before{left:50%;top:-1px;transform:translateX(-50%);border:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:10px solid var(--flow)}.life-bridge .lower{display:none}.life-zone-title{padding:10px 0 5px}.lifecycle-note{flex-direction:column}.life-build{min-height:360px;grid-template-columns:minmax(88px,1fr) 42px minmax(88px,1fr);gap:0 4px}.life-agent{font-size:11px}.life-agent .agent-combo{gap:4px}.life-operate{min-height:270px}}
 </style>
 </head>
 <body>
@@ -440,53 +635,166 @@
   </div>
 
 <script>
-  var current = 0;
-  var total = 6;
-  var titles = ["Open","Write","Reason","Operate","Fix","Close"];
+  const scenes = [
+    {label:'Introduction',title:'Evolving DevOps',accent:'#2f9e44'},
+    {label:'Platform',title:'From spec to prod',accent:'#0078d4'},
+    {label:'GitHub Copilot',title:'Equip Copilot with architecture expertise',accent:'#0078d4'},
+    {label:'GH Platform',title:'GitHub powers the agentic SDLC',accent:'#24292f'},
+    {label:'Foundry',title:'Add intelligence with Microsoft Foundry',accent:'#008f7a'},
+    {label:'SRE Agent',title:'Amplify operations with Azure SRE Agent',accent:'#e86a17'}
+  ];
+  const shortSubtitles=[
+    '',
+    '',
+    'Skills, prompts and instructions turn team practice into reusable capability.',
+    'Coding, review and security agents converge on the pull request.',
+    'Models, knowledge, tools and governance in one control plane.',
+    'Investigate, mitigate and prevent incidents with intelligent automation.'
+  ];
 
-  function goTo(i){
-    if(i<0||i>=total) return;
-    current = i;
-    // scenes
-    for(var s=0;s<total;s++){
-      var el = document.getElementById('s'+s);
-      if(el) el.classList.toggle('active', s===i);
-    }
-    // stepper
-    var steps = document.querySelectorAll('.stepper .step');
-    steps.forEach(function(st,idx){
-      st.classList.toggle('active', idx===i);
-      st.classList.toggle('done', idx<i);
-    });
-    // footer
-    document.getElementById('count').textContent = 'Scene '+(i+1)+' of '+total+'  ·  '+titles[i];
-    document.getElementById('prev').disabled = (i===0);
-    document.getElementById('next').disabled = (i===total-1);
-    // reveal agent cards (staggered)
-    var active = document.getElementById('s'+i);
-    var cards = active.querySelectorAll('.reveal');
-    cards.forEach(function(c){ c.classList.remove('show'); });
-    cards.forEach(function(c,idx){ setTimeout(function(){ c.classList.add('show'); }, 180 + idx*260); });
-    window.scrollTo({top:0, behavior:'smooth'});
-  }
-  function next(){ goTo(current+1); }
-  function prev(){ goTo(current-1); }
+  function guide(){return ''}
 
-  function doMerge(){
-    var btn = document.getElementById('mergeBtn');
-    btn.disabled = true; btn.textContent = 'Approving…';
-    var sts = document.querySelectorAll('#mergeSteps .st');
-    sts.forEach(function(st,idx){
-      setTimeout(function(){ st.classList.add('show'); }, 500 + idx*900);
-    });
-    setTimeout(function(){ btn.textContent = '✔ Merged'; }, 600);
+  function shell(index, kicker, subtitle, windowTitle, body){
+    const scene=scenes[index];
+    return `<section class="ws-scene" id="ws-scene-${index}" style="--accent:${scene.accent}">
+      <div class="ws-kicker">${kicker}</div><h1 class="ws-title">${scene.title}</h1><p class="ws-sub">${shortSubtitles[index]}</p>
+      <div class="ws-layout"><div class="ws-surface"><div class="ws-windowbar"><i></i><i></i><i></i><strong>${windowTitle}</strong></div><div class="ws-canvas">${body}</div></div></div>
+    </section>`;
   }
 
-  document.addEventListener('keydown', function(e){
-    if(e.key==='ArrowRight') next();
-    if(e.key==='ArrowLeft') prev();
-  });
+  const introduction=`<section class="ws-scene" id="ws-scene-0" style="--accent:#2f9e44">
+    <div class="ws-kicker">From delivery automation to an agentic development team</div><h1 class="ws-title">Evolving DevOps</h1>
+    <div class="evolution"><div class="evolution-grid">
+      <div class="evolution-era"><div class="evolution-card"><h2>DevOps</h2><p>Union of <strong>people, process, and technology</strong> to enable continuous delivery of value to end users.</p></div></div>
+      <div class="evolution-era"><div class="evolution-card"><h2>DevSecOps</h2><p>Union of <strong>people, process, and technology</strong> with <strong>security</strong> as a shared responsibility.</p></div></div>
+      <div class="evolution-era"><div class="evolution-card"><h2>Agentic DevOps</h2><p><strong>AI-powered agents</strong> operate as members of the dev team to <strong>automate, optimize, and accelerate</strong> every stage.</p></div></div>
+    </div></div>
+  </section>`;
 
+  const overview=`<section class="ws-scene" id="ws-scene-1" style="--accent:#0078d4">
+    <div class="ws-kicker">From spec to prod · Azure Agentic Platform</div><h1 class="ws-title">Platform lifecycle</h1>
+    <p class="ws-sub">A continuous agentic DevOps loop across the developer environment, GitHub and Azure operations.</p>
+    <div class="lifecycle">
+      <div class="lifecycle-grid">
+        <div class="life-area"><div class="life-zone"><div class="life-stack">
+          <div class="life-node"><img class="wide" src="demo/storyboard-assets/visual-studio.png" alt="Visual Studio"><span>Visual Studio<br>Family</span></div><span class="life-plus">+</span>
+          <div class="life-node"><img src="demo/storyboard-assets/copilot-agent.png" alt="GitHub Copilot"><span>Agent Mode</span></div><span class="life-plus">+</span>
+          <div class="life-node"><img src="demo/storyboard-assets/azure.svg" alt="Microsoft Azure"><span>GitHub Copilot<br>for Azure</span></div>
+        </div></div><div class="life-zone-title">Code</div></div>
+        <div class="life-bridge repo-bridge"><span class="flow-h lower"></span></div>
+        <div class="life-area"><div class="life-zone"><div class="life-build">
+          <div class="life-node life-agent"><span class="agent-combo"><img class="azure-service" src="demo/storyboard-assets/azure.svg" alt="Microsoft Azure"><span>Azure MCP Server</span></span><span class="mini-plus">+</span><span class="agent-combo"><img src="demo/storyboard-assets/copilot-agent.png" alt="GitHub Copilot"><span>Coding Agent</span></span></div>
+          <span class="flow-h bi issues-flow"></span>
+          <div class="life-node edge-right"><img src="demo/storyboard-assets/github-mark.svg" alt="GitHub"><span>GitHub Issues</span></div>
+          <span class="flow-v bi repos-flow"></span><span></span><span></span>
+          <div class="life-node repos-node"><img src="demo/storyboard-assets/github-mark.svg" alt="GitHub"><span>GitHub Repos</span></div>
+          <span class="flow-h actions-flow"></span>
+          <div class="life-node edge-right actions-node"><span class="actions-mark" role="img" aria-label="GitHub Actions"></span><span>GitHub Actions</span></div>
+        </div></div><div class="life-zone-title">Build &amp; Maintain</div></div>
+        <div class="life-bridge operate-bridge"><span class="flow-h bi upper issues-flow"></span><span class="flow-h lower actions-flow"></span></div>
+        <div class="life-area"><div class="life-zone"><div class="life-operate">
+          <div class="life-node sre"><img src="demo/storyboard-assets/sre-agent.png" alt="Azure SRE Agent"><span>SRE Agent</span></div>
+          <div class="life-node foundry"><img src="demo/storyboard-assets/microsoft-foundry.ico" alt="Microsoft Foundry"><span>Microsoft Foundry</span></div>
+          <span class="flow-v bi azure-link"></span><div class="life-node azure-platform"><img src="demo/storyboard-assets/azure.svg" alt="Microsoft Azure"><span>Azure</span></div>
+        </div></div><div class="life-zone-title">Operate</div></div>
+      </div>
+      <div class="lifecycle-note"><span><strong>Agentic DevOps:</strong> GitHub is the system of record linking build and operations.</span><span>Human review remains the production gate.</span></div>
+    </div>
+  </section>`;
+
+  const skillBody=`<div class="ws-product"><img class="ws-product-image" src="demo/storyboard-assets/copilot-agent.png" alt="GitHub Copilot"><div><h2>GitHub Copilot · customization stack</h2><p>Team context becomes reusable capability inside the IDE.</p></div></div>
+    <div class="ws-cap-label">Team customization</div>
+    <div class="ws-cap-grid copilot-grid">
+      <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-skills.svg" alt=""></span><div><b>Skills</b><small>Expertise on demand</small></div></div>
+      <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-prompt-files.svg" alt=""></span><div><b>Prompt files</b><small>Repeatable workflows</small></div></div>
+      <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-instructions.svg" alt=""></span><div><b>Instructions</b><small>Always-on standards</small></div></div>
+      <a class="ws-cap primary awesome ws-cap-link" href="https://github.com/github/awesome-copilot" target="_blank" rel="noreferrer"><span class="ws-cap-icon"><img src="demo/storyboard-assets/github-mark.svg" alt="GitHub"></span><div><b>Awesome Copilot</b><small>Community catalog</small></div></a>
+    </div>
+    <div class="ws-cap-arrow">↓</div>
+    <div class="ws-cap-grid copilot-grid">
+      <div class="ws-cap"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-tools-mcp.svg" alt=""></span><div><b>Tools</b><small>GitHub · Azure · Playwright</small></div></div>
+      <div class="ws-cap"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-agent-mode.svg" alt=""></span><div><b>Agent Mode</b><small>Plan · edit · validate</small></div></div>
+      <div class="ws-cap"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-models.svg" alt=""></span><div><b>Models</b><small>Choice per task</small></div></div>
+      <div class="ws-cap"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-custom-agents.svg" alt=""></span><div><b>Custom Agents</b><small>Specialized teammates</small></div></div>
+    </div>
+    <div class="ws-command-strip single"><code>$ gh skills install github/awesome-copilot azure-architecture-autopilot</code></div>`;
+
+  const issueBody=`<div class="ws-product"><img class="ws-product-image" src="demo/storyboard-assets/github-mark.svg" alt="GitHub"><div><h2>GitHub Platform</h2><p>Build, review and secure with specialized agents.</p></div></div>
+    <div class="ws-cap-grid">
+      <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/coding-agent.svg" alt=""></span><div><b>Coding Agent</b><small>Issue → pull request</small></div></div>
+      <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/review-agent.svg" alt=""></span><div><b>Review Agent</b><small>Code-aware feedback</small></div></div>
+      <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/autofix.svg" alt=""></span><div><b>Autofix</b><small>Vulnerability → patch</small></div></div>
+      <div class="ws-cap primary awesome"><span class="ws-cap-icon"><img src="demo/storyboard-assets/ghas.svg" alt=""></span><div><b>GitHub Advanced Security</b><small>Code · secrets · supply chain</small></div></div>
+    </div>
+    <div class="ws-flowline"><span>GitHub Issue</span><i>→</i><span>Agentic build</span><i>→</i><span>Review + security</span><i>→</i><span>Pull request</span></div>`;
+
+  const implementBody=`<div class="ws-product"><div class="ws-product-logo" style="background:#2563eb">C</div><div><h2>GitHub Copilot · agent mode</h2><p>Issue context becomes a tested implementation.</p></div></div>
+    <div class="ws-cap-grid">
+      <div class="ws-cap primary"><span class="ws-cap-icon">#42</span><div><b>Understand</b><small>Issue + instructions</small></div></div>
+      <div class="ws-cap primary"><span class="ws-cap-icon">API</span><div><b>Implement</b><small>Endpoint + OpenAPI</small></div></div>
+      <div class="ws-cap primary"><span class="ws-cap-icon">TST</span><div><b>Validate</b><small>Focused tests + lint</small></div></div>
+      <div class="ws-cap awesome"><span class="ws-cap-icon">✓</span><div><b>Review</b><small>4 files · 86 additions</small></div></div>
+    </div>
+    <div class="ws-flowline"><span>Plan</span><i>→</i><span>Edit</span><i>→</i><span>Test</span><i>→</i><span>Human review</span></div>`;
+
+  const foundryBody=`<div class="ws-product"><img class="ws-product-image" src="demo/storyboard-assets/microsoft-foundry.ico" alt="Microsoft Foundry"><div><h2>Microsoft Foundry</h2><p>Build, ground, connect and govern the agent.</p></div></div>
+    <div class="ws-cap-grid foundry-grid"><div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/foundry-models.png" alt=""></span><div><b>Agent</b><small>buildingassist · Ready</small></div></div><div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/foundry-models.png" alt=""></span><div><b>Model Router</b><small>One endpoint</small></div></div><div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/foundry-iq.png" alt=""></span><div><b>Foundry IQ</b><small>Grounded citations</small></div></div><div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/foundry-tools.png" alt=""></span><div><b>Tools</b><small>Approval-gated actions</small></div></div><div class="ws-cap"><span class="ws-cap-icon"><img src="demo/storyboard-assets/apim.svg" alt=""></span><div><b>AI Gateway</b><small>Identity · quota · routing</small></div></div><div class="ws-cap"><span class="ws-cap-icon"><img src="demo/storyboard-assets/app-insights.svg" alt=""></span><div><b>Observe</b><small>Traces · evaluations</small></div></div></div>
+    <div class="ws-chat" style="margin-top:12px"><div class="ws-chat-head">Agent playground</div><div class="ws-chat-body"><div class="ws-bubble user">How much energy did Floor 3 use this week?</div><div class="ws-bubble good">Floor 3 used <b>1,240 kWh</b>. Source: floor3-metering.md</div></div></div>`;
+
+  const sreIntroBody=`<div class="ws-product"><img class="ws-product-image" src="demo/storyboard-assets/sre-agent.png" alt="Azure SRE Agent"><div><h2>Azure SRE Agent</h2><p>A collaborative agent that maintains reliability while reducing manual intervention.</p></div></div>
+    <div class="ws-cap-grid sre-grid">
+      <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/sre-root-cause.svg" alt=""></span><div><b>Root-cause analysis</b><small>Correlate apps · platform · infrastructure</small></div></div>
+      <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/sre-incident-response.svg" alt=""></span><div><b>Incident response</b><small>Reuse resolutions · runbooks · context</small></div></div>
+      <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/sre-mitigation.svg" alt=""></span><div><b>Automated mitigation</b><small>Human-reviewed or autonomous</small></div></div>
+      <div class="ws-cap"><span class="ws-cap-icon"><img src="demo/storyboard-assets/sre-custom-subagents.svg" alt=""></span><div><b>Custom subagents</b><small>Tools · practices · knowledge</small></div></div>
+      <div class="ws-cap"><span class="ws-cap-icon"><img src="demo/storyboard-assets/sre-insights.svg" alt=""></span><div><b>Intelligent insights</b><small>Detect risks before outages</small></div></div>
+      <div class="ws-cap"><span class="ws-cap-icon"><img src="demo/storyboard-assets/sre-external-mcp.svg" alt=""></span><div><b>External MCP servers</b><small>Observability · DevOps · incidents</small></div></div>
+    </div>
+    <div class="ws-flowline"><span>Detect</span><i>→</i><span>Investigate</span><i>→</i><span>Mitigate within guardrails</span><i>→</i><span>GitHub issue</span><i>→</i><span>Copilot patch</span></div>`;
+
+  const diagnoseBody=`<div class="ws-product"><div class="ws-product-logo" style="background:#e86a17">SRE</div><div><h2>Incident investigation</h2><p>Telemetry becomes root cause and actionable work.</p></div></div>
+    <div class="ws-cap-grid">
+      <div class="ws-cap primary"><span class="ws-cap-icon">500</span><div><b>Signal</b><small>Access request spike</small></div></div>
+      <div class="ws-cap primary"><span class="ws-cap-icon">DEP</span><div><b>Correlate</b><small>Latest deployment</small></div></div>
+      <div class="ws-cap primary awesome"><span class="ws-cap-icon">RCA</span><div><b>Root cause</b><small><code>occurredAt</code> ≠ <code>occurred_at</code></small></div></div>
+      <div class="ws-cap"><span class="ws-cap-icon">#57</span><div><b>Handoff</b><small>Evidence attached</small></div></div>
+    </div>
+    <div class="ws-flowline"><span>Azure Monitor</span><i>→</i><span>SRE Agent</span><i>→</i><span>GitHub issue #57</span></div>`;
+
+  const fixBody=`<div class="ws-product"><div class="ws-product-logo" style="background:#7a4cc2">CA</div><div><h2>GitHub Copilot coding agent</h2><p>Production evidence returns as a reviewed code change.</p></div></div>
+    <div class="ws-cap-grid"><div class="ws-cap primary"><span class="ws-cap-icon">#57</span><div><b>Assigned</b><small>Evidence + reproduction</small></div></div><div class="ws-cap primary"><span class="ws-cap-icon">CA</span><div><b>Fixed</b><small>Contract aligned</small></div></div><div class="ws-cap primary"><span class="ws-cap-icon">#58</span><div><b>Pull request</b><small>Tests passing</small></div></div><div class="ws-cap awesome"><span class="ws-cap-icon">H</span><div><b>Human gate</b><small>Review + merge</small></div></div></div>
+    <div class="ws-diff"><span class="ws-del">- occurred_at = event["occurredAt"]</span><br><span class="ws-add">+ occurred_at = event["occurred_at"]</span><br><span class="ws-add">+ assert response.status_code == 201</span></div>
+    <div class="ws-actions"><button class="ws-action" id="approve-fix" onclick="approveFix()">Review and merge</button><span id="fix-result" class="ws-chip">Human approval required</span></div>`;
+
+  const pages=[introduction,overview,
+    shell(2,'Step 1 · Specify','','Visual Studio Code · GitHub Copilot',skillBody),
+    shell(3,'Step 2 · Build','','GitHub Platform · Agentic SDLC',issueBody),
+    shell(4,'Step 3 · Reason','','Microsoft Foundry · buildingassist project',foundryBody),
+    shell(5,'Step 4 · Operate + Diagnose','','Azure SRE Agent · incident investigator',sreIntroBody)];
+
+  document.body.innerHTML=`<div id="workshop"><header class="ws-top"><div class="ws-brand"><span class="ws-mark"><i></i><i></i><i></i><i></i></span>Azure Agentic Platform <small>· workshop storyboard</small></div><div class="ws-top-meta">BuildingAssist · Contoso Energy<br>From spec to prod</div></header><nav class="ws-progress" aria-label="Workshop steps">${scenes.map((s,i)=>`<button class="ws-step" onclick="goTo(${i})"><b>${i===0?'A':i}</b>${s.label}</button>`).join('')}</nav><main class="ws-main">${pages.join('')}</main><footer class="ws-footer"><span class="ws-count" id="ws-count"></span><span class="ws-footer-note">Use left/right arrow keys or the step bar</span><span class="ws-footer-space"></span><button class="ws-nav" id="ws-prev" onclick="previous()" aria-label="Previous page">←</button><button class="ws-nav next" id="ws-next" onclick="next()" aria-label="Next page">→</button></footer></div>`;
+
+  let current=0;
+  function goTo(index){
+    if(index<0||index>=scenes.length)return;
+    current=index;
+    document.querySelectorAll('.ws-scene').forEach((scene,i)=>scene.classList.toggle('active',i===index));
+    document.querySelectorAll('.ws-step').forEach((step,i)=>{step.classList.toggle('active',i===index);step.classList.toggle('done',i<index);});
+    document.getElementById('ws-count').textContent=`${index+1} / ${scenes.length} · ${scenes[index].label}`;
+    document.getElementById('ws-prev').disabled=index===0;
+    document.getElementById('ws-next').disabled=index===scenes.length-1;
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  function next(){goTo(current+1)}
+  function previous(){goTo(current-1)}
+  function approveFix(){
+    const button=document.getElementById('approve-fix');
+    const result=document.getElementById('fix-result');
+    button.textContent='Merged';button.disabled=true;
+    result.textContent='Deployed · request succeeded · healthy';
+    result.style.background='#eaf8f1';result.style.color='#08734b';
+  }
+  document.addEventListener('keydown',event=>{if(event.key==='ArrowRight')next();if(event.key==='ArrowLeft')previous();});
   goTo(0);
 </script>
 </body>

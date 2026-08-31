@@ -37,7 +37,7 @@ param backendUrl string
 
 var foundryUserRoleId = '53ca6127-db72-4b80-b1b0-d745d6d5456d'
 var normalizedFoundryEndpoint = endsWith(foundryEndpoint, '/') ? foundryEndpoint : '${foundryEndpoint}/'
-var operationsToolServerName = 'building-operations'
+var operationsToolServerName = 'building-operations-v3'
 var operationsOpenApi = replace(
   loadTextContent('../api/building-operations.openapi.json'),
   '__BACKEND_URL__',
