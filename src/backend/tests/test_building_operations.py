@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from app.building_operations import BuildingOperations
@@ -83,3 +85,37 @@ def test_comfort_critical_zone_rejects_hvac_action(
             "Reduce demand.",
             True,
         )
+
+
+def test_request_access_grants_and_serializes_audit_event(
+    operations: BuildingOperations,
+) -> None:
+    event = operations.request_access(
+        "paris-hq", "main-lobby", "BDG-1042", "badge"
+    )
+
+    assert event["decision"] == "granted"
+    assert event["occurred_at"]
+
+    outbound_payload = json.loads(event["outbound_payload"])
+    assert outbound_payload == {
+        "eventId": event["id"],
+        "eventType": "access_request",
+        "occurredAt": event["occurred_at"],
+    }
+
+
+def test_check_in_visitor_does_not_raise_during_audit_event_serialization(
+    operations: BuildingOperations,
+) -> None:
+    visitor = operations.check_in_visitor(
+        "paris-hq",
+        "main-lobby",
+        "Taylor Reed",
+        "taylor.reed@example.com",
+        "Alex Morgan",
+        "Vendor meeting",
+    )
+
+    assert visitor["status"] == "checked_in"
+    assert visitor["checked_in_at"]

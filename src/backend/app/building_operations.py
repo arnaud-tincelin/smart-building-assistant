@@ -277,7 +277,7 @@ class BuildingOperations:
             {
                 "eventId": event["id"],
                 "eventType": event["operation"],
-                "occurredAt": event["occurredAt"],
+                "occurredAt": event["occurred_at"],
             }
         )
 
