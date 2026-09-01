@@ -334,6 +334,19 @@
   .platform-map-cell b{display:block;margin-bottom:4px;font-size:13px}.platform-map-cell span{display:block;color:#9aabba}
   .platform-map-badge{display:inline-flex!important;width:max-content;max-width:100%;margin-top:11px;padding:4px 7px;border:1px solid #3ba4e8;border-radius:5px;background:#0f3556;color:#8fd3ff!important;font-size:9px!important;font-weight:900;letter-spacing:.6px;line-height:1.25;overflow-wrap:anywhere;text-transform:uppercase}
   .platform-map-cell.build .platform-map-badge{border-color:#f5b942;background:#4a3210;color:#ffd77d!important}.platform-map-cell.operate .platform-map-badge{border-color:#31c48d;background:#103d31;color:#86efc4!important}
+  button.platform-map-badge{font-family:inherit;cursor:pointer;transition:filter .15s,transform .15s}
+  button.platform-map-badge:hover{filter:brightness(1.18);transform:translateY(-1px)}
+  button.platform-map-badge:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  .asset-viewer{width:min(1180px,calc(100vw - 40px));height:min(88vh,900px);padding:0;border:1px solid #3b5065;border-radius:8px;background:#101d2d;color:#f8fafc;box-shadow:0 24px 80px rgba(0,0,0,.55)}
+  .asset-viewer::backdrop{background:rgba(4,10,18,.82)}
+  .asset-viewer-shell{display:grid;grid-template-rows:auto minmax(0,1fr);height:100%}
+  .asset-viewer-head{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #29394d;background:#172a42}
+  .asset-viewer-head strong{font-size:14px}.asset-viewer-close{width:34px;height:34px;margin-left:auto;border:1px solid #43566a;border-radius:6px;background:#101d2d;color:#fff;font-size:20px;line-height:1;cursor:pointer}
+  .asset-viewer-close:hover{background:#243b57}.asset-viewer-body{overflow:auto;padding:16px;background:#0b1625;text-align:center}
+  .asset-viewer-image{display:block;max-width:100%;height:auto;margin:0 auto;border-radius:6px}
+  .asset-viewer-image[hidden]{display:none}.asset-viewer-status{display:grid;min-height:160px;place-items:center;color:#9aabba;font-size:12px;font-weight:700}
+  .asset-viewer-status[hidden]{display:none}
+  @media(max-width:600px){.asset-viewer{width:calc(100vw - 20px);height:90vh}.asset-viewer-body{padding:8px}}
   .platform-map-meta{display:grid;grid-template-columns:94px repeat(8,minmax(112px,1fr));gap:6px;margin-top:8px}
   .platform-map-meta-label{padding:6px 7px;color:#fff;font-size:11px;font-weight:900}.platform-map-meta-item{padding:6px 7px;border-top:1px solid #53606d;color:#dbe5eb;text-align:center;font-size:11px;font-weight:750}
   .platform-map-agent .platform-map-meta-label,.platform-map-agent .platform-map-meta-item{border-top-color:#f59e0b;color:#fbbf24}.platform-map-foundation{display:grid;grid-template-columns:145px 1fr;gap:12px;margin:10px 0 0 94px;padding-top:10px;border-top:1px dashed #64748b;color:#dbe5eb;font-size:11px}.platform-map-foundation b{color:#93c5fd;letter-spacing:1px;text-transform:uppercase}.platform-map-foundation span{word-spacing:5px}
@@ -703,11 +716,11 @@
       </div>
       <div class="platform-map-row"><div class="platform-map-owner github">GitHub</div>
         <div class="platform-map-cell"><b>Copilot Chat</b><span>GitHub Discussions</span></div>
-        <div class="platform-map-cell"><b>GitHub Projects</b><span>GitHub Issues</span><span class="platform-map-badge">Copilot plan mode</span></div>
-        <div class="platform-map-cell build"><b>Codespaces</b><span>VS Code, Copilot CLI</span><span class="platform-map-badge">Coding agent</span></div>
+        <div class="platform-map-cell"><b>GitHub Projects</b><span>GitHub Issues</span><button class="platform-map-badge" type="button" onclick="openAsset('Copilot plan mode','demo/storyboard-assets/plan.png')">Copilot plan mode</button></div>
+        <div class="platform-map-cell build"><b>Codespaces</b><span>VS Code, Copilot CLI</span><button class="platform-map-badge" type="button" onclick="openAsset('Coding agent','demo/storyboard-assets/coding%20agent.webp')">Coding agent</button></div>
         <div class="platform-map-cell build"><b>GitHub Agentic Workflows</b><span>GitHub Actions</span></div>
-        <div class="platform-map-cell build"><b>GitHub Advanced Security</b><span>Dependabot, CodeQL</span><span class="platform-map-badge">Copilot Autofix</span></div>
-        <div class="platform-map-cell build"><b>Code Review</b><span>Pull requests, rulesets</span><span class="platform-map-badge">Review agent</span></div>
+        <div class="platform-map-cell build"><b>GitHub Advanced Security</b><span>Dependabot, CodeQL</span><button class="platform-map-badge" type="button" onclick="openAsset('Copilot Autofix','demo/storyboard-assets/autofix.webp')">Copilot Autofix</button></div>
+        <div class="platform-map-cell build"><b>Code Review</b><span>Pull requests, rulesets</span><button class="platform-map-badge" type="button" onclick="openAsset('Review agent','demo/storyboard-assets/review.webp')">Review agent</button></div>
         <div class="platform-map-cell operate"><b>GitHub Actions</b><span>Environments, packages</span></div>
         <div class="platform-map-cell operate"></div>
       </div>
@@ -719,7 +732,7 @@
         <div class="platform-map-cell build"><b>GHAS for Azure DevOps</b></div>
         <div class="platform-map-cell build"><b>Microsoft Defender for DevOps</b></div>
         <div class="platform-map-cell operate"><b>AKS, App Service</b><span>Container Apps, Functions</span></div>
-        <div class="platform-map-cell operate"><b>Azure Monitor</b><span>Microsoft Foundry</span><span class="platform-map-badge">Azure SRE Agent</span></div>
+        <div class="platform-map-cell operate"><b>Azure Monitor</b><span>Microsoft Foundry</span><button class="platform-map-badge" type="button" onclick="openAsset('Azure SRE Agent','demo/storyboard-assets/sre.png')">Azure SRE Agent</button></div>
       </div>
       <div class="platform-map-meta"><div class="platform-map-meta-label">Persona</div>${['Product Manager','Architect','Developer','DevOps','QA / Security','Reviewer','DevOps','SRE'].map(label=>`<div class="platform-map-meta-item">${label}</div>`).join('')}</div>
       <div class="platform-map-meta platform-map-agent"><div class="platform-map-meta-label">Agent</div>${['Research Agent','Architecture Agent','Coding Agent','DevOps Agent','Testing Agent','Review Agent','DevOps Agent','SRE Agent'].map(label=>`<div class="platform-map-meta-item">${label}</div>`).join('')}</div>
@@ -828,7 +841,7 @@
     shell(5,'Step 3 · Reason','','Microsoft Foundry · buildingassist project',foundryBody),
     shell(6,'Step 4 · Operate + Diagnose','','Azure SRE Agent · incident investigator',sreIntroBody)];
 
-  document.body.innerHTML=`<div id="workshop"><header class="ws-top"><div class="ws-brand"><span class="ws-mark"><i></i><i></i><i></i><i></i></span>Azure Agentic Platform <small>· workshop storyboard</small></div><div class="ws-top-meta">BuildingAssist · Contoso Energy<br>From spec to prod</div></header><nav class="ws-progress" aria-label="Workshop steps">${scenes.map((s,i)=>`<button class="ws-step" onclick="goTo(${i})"><b>${i===0?'A':i}</b>${s.label}</button>`).join('')}</nav><main class="ws-main">${pages.join('')}</main><footer class="ws-footer"><span class="ws-count" id="ws-count"></span><span class="ws-footer-note">Use left/right arrow keys or the step bar</span><span class="ws-footer-space"></span><button class="ws-nav" id="ws-prev" onclick="previous()" aria-label="Previous page">←</button><button class="ws-nav next" id="ws-next" onclick="next()" aria-label="Next page">→</button></footer></div>`;
+  document.body.innerHTML=`<div id="workshop"><header class="ws-top"><div class="ws-brand"><span class="ws-mark"><i></i><i></i><i></i><i></i></span>Azure Agentic Platform <small>· workshop storyboard</small></div><div class="ws-top-meta">BuildingAssist · Contoso Energy<br>From spec to prod</div></header><nav class="ws-progress" aria-label="Workshop steps">${scenes.map((s,i)=>`<button class="ws-step" onclick="goTo(${i})"><b>${i===0?'A':i}</b>${s.label}</button>`).join('')}</nav><main class="ws-main">${pages.join('')}</main><footer class="ws-footer"><span class="ws-count" id="ws-count"></span><span class="ws-footer-note">Use left/right arrow keys or the step bar</span><span class="ws-footer-space"></span><button class="ws-nav" id="ws-prev" onclick="previous()" aria-label="Previous page">←</button><button class="ws-nav next" id="ws-next" onclick="next()" aria-label="Next page">→</button></footer></div><dialog class="asset-viewer" id="asset-viewer" aria-labelledby="asset-viewer-title"><div class="asset-viewer-shell"><div class="asset-viewer-head"><strong id="asset-viewer-title"></strong><button class="asset-viewer-close" type="button" onclick="closeAsset()" aria-label="Close image viewer">×</button></div><div class="asset-viewer-body"><div class="asset-viewer-status" id="asset-viewer-status" role="status">Loading image...</div><img class="asset-viewer-image" id="asset-viewer-image" alt="" hidden></div></div></dialog>`;
 
   let current=0;
   function goTo(index){
@@ -843,6 +856,18 @@
   }
   function next(){goTo(current+1)}
   function previous(){goTo(current-1)}
+  function openAsset(title,source){
+    const dialog=document.getElementById('asset-viewer');
+    document.getElementById('asset-viewer-title').textContent=title;
+    const image=document.getElementById('asset-viewer-image');
+    const status=document.getElementById('asset-viewer-status');
+    image.hidden=true;image.removeAttribute('src');image.alt='';status.textContent='Loading image...';status.hidden=false;
+    image.onload=()=>{status.hidden=true;image.hidden=false};
+    image.onerror=()=>{status.textContent='Image could not be loaded.'};
+    image.src=source;image.alt=`${title} interface`;
+    dialog.showModal();
+  }
+  function closeAsset(){document.getElementById('asset-viewer').close()}
   function approveFix(){
     const button=document.getElementById('approve-fix');
     const result=document.getElementById('fix-result');
@@ -850,7 +875,8 @@
     result.textContent='Deployed · request succeeded · healthy';
     result.style.background='#eaf8f1';result.style.color='#08734b';
   }
-  document.addEventListener('keydown',event=>{if(event.key==='ArrowRight')next();if(event.key==='ArrowLeft')previous();});
+  document.getElementById('asset-viewer').addEventListener('click',event=>{if(event.target===event.currentTarget)closeAsset();});
+  document.addEventListener('keydown',event=>{const viewer=document.getElementById('asset-viewer');if(viewer.open){if(event.key==='Escape'){event.preventDefault();closeAsset()}return}if(event.key==='ArrowRight')next();if(event.key==='ArrowLeft')previous();});
   goTo(0);
 </script>
 </body>
