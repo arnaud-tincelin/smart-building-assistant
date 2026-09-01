@@ -252,9 +252,8 @@
   .ws-step{height:32px;padding:0 12px;border:1px solid var(--ws-line);border-radius:999px;background:#fff;color:var(--ws-muted);transition:.18s}
   .ws-step b{width:9px;height:9px;border:0;background:#cbd5e1;color:transparent}
   .ws-step:hover{border-color:#cbd5e1}.ws-step.active{color:#fff;border-color:transparent;border-bottom-color:transparent;background:#0078d4}
-  .ws-step:nth-child(3).active{background:#24292f}.ws-step:nth-child(4).active{background:#2563eb}
-  .ws-step:nth-child(5).active{background:#10b981}.ws-step:nth-child(6).active,.ws-step:nth-child(7).active{background:#f59e0b}
-  .ws-step:nth-child(8).active{background:#7c3aed}
+  .ws-step:nth-child(3).active,.ws-step:nth-child(4).active{background:#0078d4}.ws-step:nth-child(5).active{background:#24292f}
+  .ws-step:nth-child(6).active{background:#10b981}.ws-step:nth-child(7).active{background:#f59e0b}
   .ws-step.active b{width:9px;height:9px;background:rgba(255,255,255,.9);color:transparent}.ws-step.done b{width:9px;height:9px;background:#16a34a;color:transparent}
   .ws-main{max-width:1120px;padding-top:26px}
   .ws-kicker:before{height:3px}.ws-title{font-family:inherit;font-size:clamp(28px,3vw,38px);line-height:1.12;font-weight:800;margin-top:7px}
@@ -317,6 +316,28 @@
   .evolution-card h2{margin:0 0 24px;padding:10px;background:#1d2934;border-top:4px solid #2f9e44;color:#e9edf1;border-radius:8px;font-size:26px}
   .evolution-card p{margin:0;color:#e9edf1;font-size:19px;line-height:1.35}
   .evolution-card strong{color:#8ce99a}
+
+  /* Microsoft Agentic SDLC platform map */
+  .agentic-platform-scene{width:min(1220px,calc(100vw - 32px));margin-left:50%;transform:translateX(-50%)}
+  .platform-map{min-width:1080px;padding:22px 22px 17px;border:1px solid #2b3a48;border-radius:8px;background:#17212b;box-shadow:var(--ws-shadow)}
+  .platform-map-scroll{overflow-x:auto;padding-bottom:6px}
+  .platform-map-head{display:grid;grid-template-columns:94px repeat(8,minmax(112px,1fr));gap:6px;align-items:end}
+  .platform-map-phase{padding:4px 6px 9px;text-align:center;color:#9aabba;font-size:12px;font-weight:900;letter-spacing:2px;text-transform:uppercase}
+  .platform-map-phase.intent{grid-column:2/4;color:#0078d4}.platform-map-phase.build{grid-column:4/8;color:#f59e0b}.platform-map-phase.operate{grid-column:8/10;color:#10b981}
+  .platform-map-stage{padding:10px 6px;border-radius:7px 7px 4px 4px;color:#fff;text-align:center;font-size:12px;font-weight:900;letter-spacing:.8px;text-transform:uppercase}
+  .platform-map-stage.intent{background:#0078d4}.platform-map-stage.build{background:#f59e0b}.platform-map-stage.operate{background:#10b981}
+  .platform-map-row{display:grid;grid-template-columns:94px repeat(8,minmax(112px,1fr));gap:6px;margin-top:6px}
+  .platform-map-owner{display:flex;align-items:center;padding:9px 7px;border-right:1px solid #53606d;color:#dbe5eb;font-size:13px;font-weight:900;letter-spacing:.5px}
+  .platform-map-owner.github{color:#35a5f4}.platform-map-owner.azure{color:#35a5f4}
+  .platform-map-cell{min-height:112px;padding:12px;border:1px solid #29394d;border-top:4px solid #0078d4;border-radius:5px;background:#172a42;color:#f8fafc;font-size:12px;line-height:1.3}
+  .platform-map-cell.build{border-color:#29394d;border-top-color:#f59e0b;background:#172a42}.platform-map-cell.operate{border-color:#29394d;border-top-color:#10b981;background:#172a42}
+  .platform-map-cell b{display:block;margin-bottom:4px;font-size:13px}.platform-map-cell span{display:block;color:#9aabba}
+  .platform-map-badge{display:inline-flex!important;width:max-content;max-width:100%;margin-top:11px;padding:4px 7px;border:1px solid #3ba4e8;border-radius:5px;background:#0f3556;color:#8fd3ff!important;font-size:9px!important;font-weight:900;letter-spacing:.6px;line-height:1.25;overflow-wrap:anywhere;text-transform:uppercase}
+  .platform-map-cell.build .platform-map-badge{border-color:#f5b942;background:#4a3210;color:#ffd77d!important}.platform-map-cell.operate .platform-map-badge{border-color:#31c48d;background:#103d31;color:#86efc4!important}
+  .platform-map-meta{display:grid;grid-template-columns:94px repeat(8,minmax(112px,1fr));gap:6px;margin-top:8px}
+  .platform-map-meta-label{padding:6px 7px;color:#fff;font-size:11px;font-weight:900}.platform-map-meta-item{padding:6px 7px;border-top:1px solid #53606d;color:#dbe5eb;text-align:center;font-size:11px;font-weight:750}
+  .platform-map-agent .platform-map-meta-label,.platform-map-agent .platform-map-meta-item{border-top-color:#f59e0b;color:#fbbf24}.platform-map-foundation{display:grid;grid-template-columns:145px 1fr;gap:12px;margin:10px 0 0 94px;padding-top:10px;border-top:1px dashed #64748b;color:#dbe5eb;font-size:11px}.platform-map-foundation b{color:#93c5fd;letter-spacing:1px;text-transform:uppercase}.platform-map-foundation span{word-spacing:5px}
+  @media(max-width:900px){.agentic-platform-scene{width:100%;margin-left:0;transform:none}.platform-map{min-width:1080px}}
 
   /* Slide 7: Platform lifecycle */
   .lifecycle{--flow:#2f9e44;position:relative;padding:20px 22px 12px;border:1px solid #2b3a48;border-left:4px solid var(--flow);border-radius:8px;background:#0f1720;box-shadow:var(--ws-shadow)}
@@ -637,7 +658,8 @@
 <script>
   const scenes = [
     {label:'Introduction',title:'Evolving DevOps',accent:'#2f9e44'},
-    {label:'Platform',title:'From spec to prod',accent:'#0078d4'},
+    {label:'Agentic Platform',title:'Microsoft Agentic SDLC',accent:'#0078d4'},
+    {label:'Platform lifecycle',title:'From spec to prod',accent:'#0078d4'},
     {label:'GitHub Copilot',title:'Equip Copilot with architecture expertise',accent:'#0078d4'},
     {label:'GH Platform',title:'GitHub powers the agentic SDLC',accent:'#24292f'},
     {label:'Foundry',title:'Add intelligence with Microsoft Foundry',accent:'#008f7a'},
@@ -645,6 +667,7 @@
   ];
   const shortSubtitles=[
     '',
+    'One platform of agents and services spanning intent, build and operations.',
     '',
     'Skills, prompts and instructions turn team practice into reusable capability.',
     'Coding, review and security agents converge on the pull request.',
@@ -671,7 +694,40 @@
     </div></div>
   </section>`;
 
-  const overview=`<section class="ws-scene" id="ws-scene-1" style="--accent:#0078d4">
+  const agenticPlatform=`<section class="ws-scene agentic-platform-scene" id="ws-scene-1" style="--accent:#0078d4">
+    <div class="ws-kicker">Platform breadth</div><h1 class="ws-title">Microsoft Agentic SDLC</h1>
+    <p class="ws-sub">One connected platform supporting every role and stage, from the first idea through production operations.</p>
+    <div class="platform-map-scroll"><div class="platform-map">
+      <div class="platform-map-head"><span></span><div class="platform-map-phase intent">Intent</div><div class="platform-map-phase build">Build</div><div class="platform-map-phase operate">Operate</div><span></span>
+        ${['Ideate','Plan'].map(label=>`<div class="platform-map-stage intent">${label}</div>`).join('')}${['Code','Build','Test','Review'].map(label=>`<div class="platform-map-stage build">${label}</div>`).join('')}${['Release','Operate'].map(label=>`<div class="platform-map-stage operate">${label}</div>`).join('')}
+      </div>
+      <div class="platform-map-row"><div class="platform-map-owner github">GitHub</div>
+        <div class="platform-map-cell"><b>Copilot Chat</b><span>GitHub Discussions</span></div>
+        <div class="platform-map-cell"><b>GitHub Projects</b><span>GitHub Issues</span><span class="platform-map-badge">Copilot plan mode</span></div>
+        <div class="platform-map-cell build"><b>Codespaces</b><span>VS Code, Copilot CLI</span><span class="platform-map-badge">Coding agent</span></div>
+        <div class="platform-map-cell build"><b>GitHub Agentic Workflows</b><span>GitHub Actions</span></div>
+        <div class="platform-map-cell build"><b>GitHub Advanced Security</b><span>Dependabot, CodeQL</span><span class="platform-map-badge">Copilot Autofix</span></div>
+        <div class="platform-map-cell build"><b>Code Review</b><span>Pull requests, rulesets</span><span class="platform-map-badge">Review agent</span></div>
+        <div class="platform-map-cell operate"><b>GitHub Actions</b><span>Environments, packages</span></div>
+        <div class="platform-map-cell operate"></div>
+      </div>
+      <div class="platform-map-row"><div class="platform-map-owner azure">Azure</div>
+        <div class="platform-map-cell"><b>Microsoft Visio</b></div>
+        <div class="platform-map-cell"><b>Azure Boards</b><span>Work items</span></div>
+        <div class="platform-map-cell build"><b>Microsoft Dev Box</b><span>Azure Repos</span></div>
+        <div class="platform-map-cell build"><b>Azure Pipelines</b><span>CI/CD</span></div>
+        <div class="platform-map-cell build"><b>GHAS for Azure DevOps</b></div>
+        <div class="platform-map-cell build"><b>Microsoft Defender for DevOps</b></div>
+        <div class="platform-map-cell operate"><b>AKS, App Service</b><span>Container Apps, Functions</span></div>
+        <div class="platform-map-cell operate"><b>Azure Monitor</b><span>Microsoft Foundry</span><span class="platform-map-badge">Azure SRE Agent</span></div>
+      </div>
+      <div class="platform-map-meta"><div class="platform-map-meta-label">Persona</div>${['Product Manager','Architect','Developer','DevOps','QA / Security','Reviewer','DevOps','SRE'].map(label=>`<div class="platform-map-meta-item">${label}</div>`).join('')}</div>
+      <div class="platform-map-meta platform-map-agent"><div class="platform-map-meta-label">Agent</div>${['Research Agent','Architecture Agent','Coding Agent','DevOps Agent','Testing Agent','Review Agent','DevOps Agent','SRE Agent'].map(label=>`<div class="platform-map-meta-item">${label}</div>`).join('')}</div>
+      <div class="platform-map-foundation"><b>Secured &amp; governed</b><span>Azure · GitHub Enterprise · GitHub Advanced Security · Defender for Cloud · Microsoft Foundry · AI Gateway</span></div>
+    </div></div>
+  </section>`;
+
+  const overview=`<section class="ws-scene" id="ws-scene-2" style="--accent:#0078d4">
     <div class="ws-kicker">From spec to prod · Azure Agentic Platform</div><h1 class="ws-title">Platform lifecycle</h1>
     <p class="ws-sub">A continuous agentic DevOps loop across the developer environment, GitHub and Azure operations.</p>
     <div class="lifecycle">
@@ -766,11 +822,11 @@
     <div class="ws-diff"><span class="ws-del">- occurred_at = event["occurredAt"]</span><br><span class="ws-add">+ occurred_at = event["occurred_at"]</span><br><span class="ws-add">+ assert response.status_code == 201</span></div>
     <div class="ws-actions"><button class="ws-action" id="approve-fix" onclick="approveFix()">Review and merge</button><span id="fix-result" class="ws-chip">Human approval required</span></div>`;
 
-  const pages=[introduction,overview,
-    shell(2,'Step 1 · Specify','','Visual Studio Code · GitHub Copilot',skillBody),
-    shell(3,'Step 2 · Build','','GitHub Platform · Agentic SDLC',issueBody),
-    shell(4,'Step 3 · Reason','','Microsoft Foundry · buildingassist project',foundryBody),
-    shell(5,'Step 4 · Operate + Diagnose','','Azure SRE Agent · incident investigator',sreIntroBody)];
+  const pages=[introduction,agenticPlatform,overview,
+    shell(3,'Step 1 · Specify','','Visual Studio Code · GitHub Copilot',skillBody),
+    shell(4,'Step 2 · Build','','GitHub Platform · Agentic SDLC',issueBody),
+    shell(5,'Step 3 · Reason','','Microsoft Foundry · buildingassist project',foundryBody),
+    shell(6,'Step 4 · Operate + Diagnose','','Azure SRE Agent · incident investigator',sreIntroBody)];
 
   document.body.innerHTML=`<div id="workshop"><header class="ws-top"><div class="ws-brand"><span class="ws-mark"><i></i><i></i><i></i><i></i></span>Azure Agentic Platform <small>· workshop storyboard</small></div><div class="ws-top-meta">BuildingAssist · Contoso Energy<br>From spec to prod</div></header><nav class="ws-progress" aria-label="Workshop steps">${scenes.map((s,i)=>`<button class="ws-step" onclick="goTo(${i})"><b>${i===0?'A':i}</b>${s.label}</button>`).join('')}</nav><main class="ws-main">${pages.join('')}</main><footer class="ws-footer"><span class="ws-count" id="ws-count"></span><span class="ws-footer-note">Use left/right arrow keys or the step bar</span><span class="ws-footer-space"></span><button class="ws-nav" id="ws-prev" onclick="previous()" aria-label="Previous page">←</button><button class="ws-nav next" id="ws-next" onclick="next()" aria-label="Next page">→</button></footer></div>`;
 
