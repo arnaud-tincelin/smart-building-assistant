@@ -27,6 +27,15 @@ param knowledgeMcpEndpoint string
 @description('Foundry project connection name for the Knowledge Base MCP endpoint.')
 param knowledgeConnectionName string = 'buildingassist-knowledge'
 
+@description('Azure AI Search endpoint used by the Foundry IQ management experience.')
+param searchEndpoint string
+
+@description('Azure AI Search resource ID used by the Foundry IQ management experience.')
+param searchResourceId string
+
+@description('Foundry project connection name for browsing Foundry IQ resources.')
+param searchConnectionName string = 'search-connection'
+
 @description('Deployment name used by the agent and Responses API.')
 param modelDeploymentName string = 'model-router'
 
@@ -104,6 +113,23 @@ resource knowledgeConnection 'Microsoft.CognitiveServices/accounts/projects/conn
   })
 }
 
+resource searchConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-10-01-preview' = {
+  parent: project
+  name: searchConnectionName
+  properties: {
+    category: 'CognitiveSearch'
+    target: searchEndpoint
+    authType: 'AAD'
+    isSharedToAll: false
+    metadata: {
+      type: 'azure_ai_search'
+      ApiType: 'Azure'
+      ResourceId: searchResourceId
+      ApiVersion: '2025-11-01-preview'
+    }
+  }
+}
+
 resource appInsightsConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2026-05-01' = {
   parent: project
   name: appInsightsConnectionName
@@ -134,4 +160,5 @@ output modelDeploymentId string = modelDeployment.id
 output modelVersion string = modelVersion
 output modelCapacity int = modelCapacity
 output knowledgeConnectionName string = knowledgeConnection.name
+output searchConnectionName string = searchConnection.name
 output appInsightsConnectionName string = appInsightsConnection.name

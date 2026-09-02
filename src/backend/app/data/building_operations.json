@@ -40,14 +40,18 @@
           "name": "Floor 3 offices",
           "temperature_c": 25.6,
           "setpoint_c": 23.0,
-          "occupancy_percent": 82
+          "occupancy_percent": 82,
+          "co2_ppm": 1180,
+          "relative_humidity_percent": 58
         },
         {
           "id": "floor-5",
           "name": "Floor 5 collaboration hub",
           "temperature_c": 24.1,
           "setpoint_c": 23.0,
-          "occupancy_percent": 67
+          "occupancy_percent": 67,
+          "co2_ppm": 720,
+          "relative_humidity_percent": 45
         }
       ],
       "alerts": [
@@ -106,14 +110,18 @@
           "name": "Prototype lab",
           "temperature_c": 21.5,
           "setpoint_c": 21.0,
-          "occupancy_percent": 54
+          "occupancy_percent": 54,
+          "co2_ppm": 840,
+          "relative_humidity_percent": 42
         },
         {
           "id": "office-east",
           "name": "East office wing",
           "temperature_c": 22.7,
           "setpoint_c": 22.0,
-          "occupancy_percent": 66
+          "occupancy_percent": 66,
+          "co2_ppm": 760,
+          "relative_humidity_percent": 40
         }
       ],
       "alerts": [],
@@ -164,14 +172,18 @@
           "name": "Dispatch center",
           "temperature_c": 23.4,
           "setpoint_c": 22.5,
-          "occupancy_percent": 58
+          "occupancy_percent": 58,
+          "co2_ppm": 920,
+          "relative_humidity_percent": 47
         },
         {
           "id": "warehouse-a",
           "name": "Warehouse A",
           "temperature_c": 21.8,
           "setpoint_c": 21.0,
-          "occupancy_percent": 24
+          "occupancy_percent": 24,
+          "co2_ppm": 680,
+          "relative_humidity_percent": 44
         }
       ],
       "alerts": [

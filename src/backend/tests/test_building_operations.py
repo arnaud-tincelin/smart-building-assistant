@@ -26,6 +26,8 @@ def test_lists_buildings_and_separates_information_from_current_data(
     assert "highest afternoon cooling sensitivity" in information["specificities"][1]
     assert "telemetry" not in information
     assert data["telemetry"]["current_power_kw"] == 184.6
+    assert data["zones"][0]["co2_ppm"] == 1180
+    assert data["zones"][0]["relative_humidity_percent"] == 58
     assert data["as_of"] == "2026-08-27T09:00:00Z"
     assert data["active_alerts"][0]["id"] == "ALT-PAR-001"
     assert "specificities" not in data

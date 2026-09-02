@@ -1,0 +1,1 @@
+Evaluate BuildingAssist compliance answers that retrieve applicable metric thresholds from Foundry IQ, retrieve current building telemetry through the operations MCP tool, compare matching metrics and units, include the live as_of timestamp and knowledge-base citations, and return exactly i don't know when required rule or live data is unavailable.

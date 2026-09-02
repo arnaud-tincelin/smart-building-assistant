@@ -13,6 +13,12 @@
     },
     "apimPublisherEmail": {
       "value": "${APIM_PUBLISHER_EMAIL=demo@contoso-energy.example}"
+    },
+    "backendImage": {
+      "value": "${SERVICE_BACKEND_IMAGE_NAME=mcr.microsoft.com/azuredocs/containerapps-helloworld:latest}"
+    },
+    "frontendImage": {
+      "value": "${SERVICE_FRONTEND_IMAGE_NAME=mcr.microsoft.com/azuredocs/containerapps-helloworld:latest}"
     }
   }
 }

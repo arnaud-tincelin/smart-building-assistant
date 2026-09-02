@@ -1,0 +1,7 @@
+name: buildingassist-compliance
+agent:
+    name: buildingassist-agent
+    kind: hosted
+options:
+    eval_model: model-router
+max_samples: 15

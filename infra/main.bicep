@@ -24,6 +24,12 @@ param searchLocation string = 'centralus'
 @description('Publisher email for APIM.')
 param apimPublisherEmail string = 'demo@contoso-energy.example'
 
+@description('Backend container image. Uses the starter image only before the first application deployment.')
+param backendImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+
+@description('Frontend container image. Uses the starter image only before the first application deployment.')
+param frontendImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+
 var tags = {
   'azd-env-name': environmentName
   project: 'buildingassist'
@@ -110,6 +116,8 @@ module foundry 'modules/foundry.bicep' = {
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     knowledgeMcpEndpoint: knowledgeMcpEndpoint
     knowledgeConnectionName: knowledgeBaseName
+    searchEndpoint: search.outputs.endpoint
+    searchResourceId: search.outputs.id
   }
 }
 
@@ -156,6 +164,7 @@ module backend 'modules/container-app.bicep' = {
     environmentId: appsEnv.outputs.environmentId
     identityId: identity.outputs.identityId
     registryLoginServer: registry.outputs.loginServer
+    image: backendImage
     targetPort: 8000
     external: true
     env: [
@@ -213,6 +222,7 @@ module frontend 'modules/container-app.bicep' = {
     environmentId: appsEnv.outputs.environmentId
     identityId: identity.outputs.identityId
     registryLoginServer: registry.outputs.loginServer
+    image: frontendImage
     targetPort: 80
     external: true
     // The backend URL is rendered into config.js at container start from this
@@ -269,6 +279,7 @@ output APPLICATIONINSIGHTS_RESOURCE_ID string = monitoring.outputs.appInsightsId
 output APPLICATIONINSIGHTS_NAME string = monitoring.outputs.appInsightsName
 output APPLICATIONINSIGHTS_CONNECTION_NAME string = foundry.outputs.appInsightsConnectionName
 output AZURE_SEARCH_ENDPOINT string = search.outputs.endpoint
+output AZURE_SEARCH_CONNECTION string = foundry.outputs.searchConnectionName
 output BUILDINGASSIST_KNOWLEDGE_MCP_ENDPOINT string = knowledgeMcpEndpoint
 output BUILDINGASSIST_KNOWLEDGE_CONNECTION string = foundry.outputs.knowledgeConnectionName
 output SERVICE_BACKEND_URL string = backendUrl

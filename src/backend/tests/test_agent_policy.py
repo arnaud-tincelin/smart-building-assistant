@@ -23,3 +23,15 @@ def test_agent_policy_defines_separate_information_and_data_tools() -> None:
         "operations_createWorkOrder",
         "operations_setHvacSetpoint",
     ]
+
+
+def test_agent_policy_requires_rules_and_live_data_for_compliance_questions() -> None:
+    assert "compliance, threshold, limit, or out-of-range questions" in AGENT_INSTRUCTIONS
+    assert "always use both sources" in AGENT_INSTRUCTIONS
+    assert "knowledge_base_retrieve" in AGENT_INSTRUCTIONS
+    assert "operations_getBuildingData" in AGENT_INSTRUCTIONS
+    assert "applicable retrieved rule and matching units" in AGENT_INSTRUCTIONS
+    assert (
+        "current value, threshold, compliant/non-compliant result, live as_of"
+        in AGENT_INSTRUCTIONS
+    )
