@@ -125,6 +125,7 @@ resource searchConnection 'Microsoft.CognitiveServices/accounts/projects/connect
       type: 'azure_ai_search'
       ApiType: 'Azure'
       ResourceId: searchResourceId
+      ApiVersion: '2025-11-01-preview'
     }
   }
 }

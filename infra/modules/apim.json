@@ -1,0 +1,276 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.45.15.27210",
+      "templateHash": "13822365251708380456"
+    },
+    "description": "Azure API Management AI Gateway tier (preview) with a managed-identity Foundry\nprovider, Model Router registration, structured token policy, and an OpenAPI ToolServer.\n"
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "allowedValues": [
+        "eastus2",
+        "swedencentral"
+      ]
+    },
+    "tags": {
+      "type": "object"
+    },
+    "apimName": {
+      "type": "string"
+    },
+    "publisherEmail": {
+      "type": "string"
+    },
+    "publisherName": {
+      "type": "string"
+    },
+    "foundryAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Foundry account that hosts the model deployment."
+      }
+    },
+    "foundryEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "Foundry account endpoint used by the AI Gateway model provider."
+      }
+    },
+    "modelDeploymentId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the Foundry model deployment exposed by the gateway."
+      }
+    },
+    "modelDeploymentName": {
+      "type": "string",
+      "metadata": {
+        "description": "Model deployment name clients send in the model field."
+      }
+    },
+    "modelVersion": {
+      "type": "string",
+      "metadata": {
+        "description": "Version of the model behind the Foundry deployment."
+      }
+    },
+    "tokenLimitPerMinute": {
+      "type": "int",
+      "defaultValue": 30000,
+      "minValue": 1,
+      "metadata": {
+        "description": "Per-caller token allowance for the registered model during each minute."
+      }
+    },
+    "backendUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "Public base URL of the BuildingAssist backend API."
+      }
+    }
+  },
+  "variables": {
+    "$fxv#0": "{\n  \"openapi\": \"3.0.3\",\n  \"info\": {\n    \"title\": \"Contoso Building Operations API\",\n    \"version\": \"1.0.0\",\n    \"description\": \"Fictional building metadata, telemetry, alerts, and bounded actions for the BuildingAssist demo.\"\n  },\n  \"servers\": [\n    {\n      \"url\": \"__BACKEND_URL__\"\n    }\n  ],\n  \"paths\": {\n    \"/operations/buildings\": {\n      \"get\": {\n        \"operationId\": \"listBuildings\",\n        \"summary\": \"List buildings\",\n        \"description\": \"List buildings available in the simulated operations platform.\",\n        \"responses\": {\n          \"200\": {\n            \"description\": \"The simulated building portfolio.\",\n            \"content\": {\n              \"application/json\": {\n                \"schema\": {\n                  \"type\": \"object\"\n                }\n              }\n            }\n          }\n        }\n      }\n    },\n    \"/operations/buildings/{building_id}/information\": {\n      \"get\": {\n        \"operationId\": \"getBuildingInformation\",\n        \"summary\": \"Get building information\",\n        \"description\": \"Get authoritative metadata, specificities, zones, and policy for a building.\",\n        \"parameters\": [\n          {\n            \"name\": \"building_id\",\n            \"in\": \"path\",\n            \"required\": true,\n            \"description\": \"Building identifier returned by listBuildings.\",\n            \"schema\": {\n              \"type\": \"string\",\n              \"minLength\": 1,\n              \"maxLength\": 64\n            }\n          }\n        ],\n        \"responses\": {\n          \"200\": {\n            \"description\": \"Stable information for the requested building.\",\n            \"content\": {\n              \"application/json\": {\n                \"schema\": {\n                  \"type\": \"object\"\n                }\n              }\n            }\n          },\n          \"400\": {\n            \"description\": \"The building identifier is unknown.\"\n          }\n        }\n      }\n    },\n    \"/operations/buildings/{building_id}/data\": {\n      \"get\": {\n        \"operationId\": \"getBuildingData\",\n        \"summary\": \"Get current building data\",\n        \"description\": \"Get time-stamped telemetry, zone measurements, and active alerts for a building.\",\n        \"parameters\": [\n          {\n            \"name\": \"building_id\",\n            \"in\": \"path\",\n            \"required\": true,\n            \"description\": \"Building identifier returned by listBuildings.\",\n            \"schema\": {\n              \"type\": \"string\",\n              \"minLength\": 1,\n              \"maxLength\": 64\n            }\n          }\n        ],\n        \"responses\": {\n          \"200\": {\n            \"description\": \"Current simulated data for the requested building.\",\n            \"content\": {\n              \"application/json\": {\n                \"schema\": {\n                  \"type\": \"object\"\n                }\n              }\n            }\n          },\n          \"400\": {\n            \"description\": \"The building identifier is unknown.\"\n          }\n        }\n      }\n    },\n    \"/operations/work-orders\": {\n      \"post\": {\n        \"operationId\": \"createWorkOrder\",\n        \"summary\": \"Create a work order\",\n        \"description\": \"Create a fictional maintenance work order in the simulator.\",\n        \"requestBody\": {\n          \"required\": true,\n          \"content\": {\n            \"application/json\": {\n              \"schema\": {\n                \"type\": \"object\",\n                \"required\": [\n                  \"building_id\",\n                  \"title\",\n                  \"reason\"\n                ],\n                \"properties\": {\n                  \"building_id\": {\n                    \"type\": \"string\",\n                    \"description\": \"Building identifier returned by listBuildings.\"\n                  },\n                  \"title\": {\n                    \"type\": \"string\",\n                    \"description\": \"Short maintenance work order title.\"\n                  },\n                  \"reason\": {\n                    \"type\": \"string\",\n                    \"description\": \"Sourced reason for creating the work order.\"\n                  },\n                  \"priority\": {\n                    \"type\": \"string\",\n                    \"enum\": [\n                      \"low\",\n                      \"medium\",\n                      \"high\"\n                    ],\n                    \"default\": \"medium\"\n                  }\n                }\n              }\n            }\n          }\n        },\n        \"responses\": {\n          \"200\": {\n            \"description\": \"The created fictional work order.\",\n            \"content\": {\n              \"application/json\": {\n                \"schema\": {\n                  \"type\": \"object\"\n                }\n              }\n            }\n          },\n          \"400\": {\n            \"description\": \"The request violates the simulator policy.\"\n          }\n        }\n      }\n    },\n    \"/operations/hvac-setpoints\": {\n      \"post\": {\n        \"operationId\": \"setHvacSetpoint\",\n        \"summary\": \"Set a temporary HVAC setpoint\",\n        \"description\": \"Apply a temporary fictional HVAC setpoint after explicit confirmation.\",\n        \"requestBody\": {\n          \"required\": true,\n          \"content\": {\n            \"application/json\": {\n              \"schema\": {\n                \"type\": \"object\",\n                \"required\": [\n                  \"building_id\",\n                  \"zone_id\",\n                  \"temperature_c\",\n                  \"duration_minutes\",\n                  \"reason\"\n                ],\n                \"properties\": {\n                  \"building_id\": {\n                    \"type\": \"string\"\n                  },\n                  \"zone_id\": {\n                    \"type\": \"string\"\n                  },\n                  \"temperature_c\": {\n                    \"type\": \"number\"\n                  },\n                  \"duration_minutes\": {\n                    \"type\": \"integer\"\n                  },\n                  \"reason\": {\n                    \"type\": \"string\"\n                  },\n                  \"confirmed\": {\n                    \"type\": \"string\",\n                    \"enum\": [\n                      \"true\",\n                      \"false\"\n                    ],\n                    \"default\": \"false\"\n                  }\n                }\n              }\n            }\n          }\n        },\n        \"responses\": {\n          \"200\": {\n            \"description\": \"Confirmation request or applied fictional setpoint.\",\n            \"content\": {\n              \"application/json\": {\n                \"schema\": {\n                  \"type\": \"object\"\n                }\n              }\n            }\n          },\n          \"400\": {\n            \"description\": \"The request violates the simulator policy.\"\n          }\n        }\n      }\n    }\n  }\n}\n",
+    "foundryUserRoleId": "53ca6127-db72-4b80-b1b0-d745d6d5456d",
+    "normalizedFoundryEndpoint": "[if(endsWith(parameters('foundryEndpoint'), '/'), parameters('foundryEndpoint'), format('{0}/', parameters('foundryEndpoint')))]",
+    "operationsToolServerName": "building-operations",
+    "operationsEndpointId": "[replace(guid(parameters('apimName'), variables('operationsToolServerName'), 'operations'), '-', '')]",
+    "operationsOpenApi": "[replace(variables('$fxv#0'), '__BACKEND_URL__', parameters('backendUrl'))]"
+  },
+  "resources": {
+    "aiGateway": {
+      "type": "Microsoft.ApiManagement/service",
+      "apiVersion": "2025-09-01-preview",
+      "name": "[parameters('apimName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "sku": {
+        "name": "AIGateway",
+        "capacity": 1
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "publisherEmail": "[parameters('publisherEmail')]",
+        "publisherName": "[parameters('publisherName')]"
+      }
+    },
+    "connectorNamespace": {
+      "type": "Microsoft.Web/connectorGateways",
+      "apiVersion": "2026-05-01-preview",
+      "name": "[parameters('apimName')]",
+      "location": "[parameters('location')]",
+      "properties": {},
+      "dependsOn": [
+        "aiGateway"
+      ]
+    },
+    "defaultWorkspace": {
+      "existing": true,
+      "type": "Microsoft.ApiManagement/service/workspaces",
+      "apiVersion": "2025-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimName'), 'default')]",
+      "dependsOn": [
+        "aiGateway"
+      ]
+    },
+    "foundry": {
+      "existing": true,
+      "type": "Microsoft.CognitiveServices/accounts",
+      "apiVersion": "2025-06-01",
+      "name": "[parameters('foundryAccountName')]"
+    },
+    "gatewayFoundryUser": {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('foundryAccountName'))]",
+      "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('foundryAccountName')), resourceId('Microsoft.ApiManagement/service', parameters('apimName')), variables('foundryUserRoleId'))]",
+      "properties": {
+        "principalId": "[reference('aiGateway', '2025-09-01-preview', 'full').identity.principalId]",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('foundryUserRoleId'))]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "aiGateway"
+      ]
+    },
+    "foundryProvider": {
+      "type": "Microsoft.ApiManagement/service/workspaces/modelProviders",
+      "apiVersion": "2025-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimName'), 'default', 'foundry')]",
+      "properties": {
+        "kind": "Foundry",
+        "displayName": "Microsoft Foundry",
+        "description": "Managed-identity provider for the BuildingAssist model deployment.",
+        "foundry": {
+          "endpoint": "[variables('normalizedFoundryEndpoint')]",
+          "resourceIds": [
+            "[resourceId('Microsoft.CognitiveServices/accounts', parameters('foundryAccountName'))]"
+          ],
+          "authentication": {
+            "kind": "ManagedIdentity",
+            "managedIdentity": {
+              "resource": "https://cognitiveservices.azure.com/"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "aiGateway",
+        "gatewayFoundryUser"
+      ]
+    },
+    "model": {
+      "type": "Microsoft.ApiManagement/service/workspaces/modelProviders/models",
+      "apiVersion": "2025-09-01-preview",
+      "name": "[format('{0}/{1}/{2}/{3}', parameters('apimName'), 'default', 'foundry', parameters('modelDeploymentName'))]",
+      "properties": {
+        "description": "Model Router exposed through the BuildingAssist AI Gateway.",
+        "displayName": "[parameters('modelDeploymentName')]",
+        "apiFormat": "OpenAIChatCompletions",
+        "supportedEndpoints": [
+          "/openai/v1/chat/completions",
+          "/openai/v1/responses"
+        ],
+        "deployment": {
+          "resourceId": "[parameters('modelDeploymentId')]",
+          "modelName": "[parameters('modelDeploymentName')]",
+          "modelVersion": "[parameters('modelVersion')]"
+        },
+        "policies": [
+          {
+            "type": "tokenLimit",
+            "period": "minute",
+            "count": "[parameters('tokenLimitPerMinute')]",
+            "counterKey": "Identity"
+          }
+        ]
+      },
+      "dependsOn": [
+        "foundryProvider"
+      ]
+    },
+    "operationsToolServer": {
+      "type": "Microsoft.ApiManagement/service/workspaces/toolServers",
+      "apiVersion": "2025-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimName'), 'default', variables('operationsToolServerName'))]",
+      "properties": {
+        "type": "mcp",
+        "displayName": "Contoso Building Operations",
+        "description": "Fictional building information, telemetry, alerts, and bounded actions.",
+        "endpoints": [
+          {
+            "id": "[variables('operationsEndpointId')]",
+            "namespace": "operations",
+            "kind": "openApi",
+            "openApi": {
+              "specSource": {
+                "type": "inline",
+                "contentBase64": "[base64(variables('operationsOpenApi'))]"
+              }
+            },
+            "credentials": {
+              "type": "none"
+            },
+            "required": true
+          }
+        ]
+      },
+      "dependsOn": [
+        "aiGateway"
+      ]
+    },
+    "runtimeApiKey": {
+      "type": "Microsoft.ApiManagement/service/apiKeys",
+      "apiVersion": "2025-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimName'), 'buildingassist')]",
+      "properties": {
+        "displayName": "BuildingAssist runtime key"
+      },
+      "dependsOn": [
+        "aiGateway"
+      ]
+    }
+  },
+  "outputs": {
+    "apimId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.ApiManagement/service', parameters('apimName'))]"
+    },
+    "gatewayUrl": {
+      "type": "string",
+      "value": "[reference('aiGateway').gatewayUrl]"
+    },
+    "modelEndpoint": {
+      "type": "string",
+      "value": "[format('{0}/default/models/openai/v1', reference('aiGateway').gatewayUrl)]"
+    },
+    "modelName": {
+      "type": "string",
+      "value": "[parameters('modelDeploymentName')]"
+    },
+    "runtimeApiKeyId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.ApiManagement/service/apiKeys', parameters('apimName'), 'buildingassist')]"
+    },
+    "connectorNamespaceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Web/connectorGateways', parameters('apimName'))]"
+    },
+    "operationsMcpEndpoint": {
+      "type": "string",
+      "value": "[format('{0}/default/toolservers/{1}/mcp', reference('aiGateway').gatewayUrl, variables('operationsToolServerName'))]"
+    },
+    "runtimeApiKey": {
+      "type": "securestring",
+      "value": "[listSecrets(resourceId('Microsoft.ApiManagement/service/apiKeys', parameters('apimName'), 'buildingassist'), '2025-09-01-preview').primaryKey]"
+    }
+  }
+}
