@@ -11,6 +11,9 @@ param appPrincipalId string
 @description('Principal id of the Foundry project system-assigned identity.')
 param foundryProjectPrincipalId string
 
+@description('Principal id of the Azure AI Search system-assigned identity.')
+param searchPrincipalId string
+
 @description('Optional developer principal id — granted Foundry access for the playground.')
 param developerPrincipalId string = ''
 
@@ -73,6 +76,17 @@ resource cognitiveUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
+// Search invokes the Knowledge Base chat model through the Foundry account.
+resource searchCognitiveUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(foundry.id, searchPrincipalId, cognitiveServicesUserRoleId)
+  scope: foundry
+  properties: {
+    principalId: searchPrincipalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // Developer running azd can use the Foundry project/playground.
 resource developerAiUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(developerPrincipalId)) {
   name: guid(foundry.id, developerPrincipalId, azureAiUserRoleId)
@@ -97,7 +111,10 @@ resource developerSearchDataContributor 'Microsoft.Authorization/roleAssignments
   scope: search
   properties: {
     principalId: developerPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataContributorRoleId)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      searchIndexDataContributorRoleId
+    )
   }
 }
 
@@ -121,27 +138,31 @@ resource foundryProjectSearchDataReader 'Microsoft.Authorization/roleAssignments
   }
 }
 
-resource foundryTraceReaders 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for roleId in [
-  logAnalyticsReaderRoleId
-  privilegedMonitoringDataReaderRoleId
-]: {
-  name: guid(appInsights.id, foundryProjectPrincipalId, roleId)
-  scope: appInsights
-  properties: {
-    principalId: foundryProjectPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleId)
-    principalType: 'ServicePrincipal'
+resource foundryTraceReaders 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for roleId in [
+    logAnalyticsReaderRoleId
+    privilegedMonitoringDataReaderRoleId
+  ]: {
+    name: guid(appInsights.id, foundryProjectPrincipalId, roleId)
+    scope: appInsights
+    properties: {
+      principalId: foundryProjectPrincipalId
+      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleId)
+      principalType: 'ServicePrincipal'
+    }
   }
-}]
+]
 
-resource developerTraceReaders 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for roleId in [
-  logAnalyticsReaderRoleId
-  privilegedMonitoringDataReaderRoleId
-]: if (!empty(developerPrincipalId)) {
-  name: guid(appInsights.id, developerPrincipalId, roleId)
-  scope: appInsights
-  properties: {
-    principalId: developerPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleId)
+resource developerTraceReaders 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for roleId in [
+    logAnalyticsReaderRoleId
+    privilegedMonitoringDataReaderRoleId
+  ]: if (!empty(developerPrincipalId)) {
+    name: guid(appInsights.id, developerPrincipalId, roleId)
+    scope: appInsights
+    properties: {
+      principalId: developerPrincipalId
+      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleId)
+    }
   }
-}]
+]

@@ -159,7 +159,7 @@
 <style>
   :root{
     --ws-ink:#101820;--ws-paper:#f4f7f8;--ws-white:#fff;--ws-line:#d9e0e3;
-    --ws-azure:#0078d4;--ws-github:#24292f;--ws-foundry:#008f7a;--ws-sre:#e86a17;
+    --ws-azure:#0078d4;--ws-github:#975DCA;--ws-foundry:#008f7a;--ws-sre:#e86a17;
     --ws-lime:#c9f269;--ws-muted:#5f6b73;--ws-shadow:0 18px 50px rgba(16,24,32,.12);
   }
   body > .topbar,body > .stepper,body > .stage,body > .foot{display:none}
@@ -211,6 +211,21 @@
   .sre-grid .ws-cap-icon img{width:24px;height:24px}
   .ws-cap-link{color:inherit;text-decoration:none}.ws-cap-link:hover b,.ws-cap-link:focus-visible b{color:#6ec8ff;text-decoration:underline}
   .ws-cap-arrow{text-align:center;color:#6ec8ff;font-size:22px;line-height:1;margin:9px 0}
+  .copilot-hub{position:relative;display:grid;grid-template-columns:minmax(250px,320px) 220px minmax(250px,320px);grid-template-areas:"custom center agent" "tools center models";grid-template-rows:auto auto;column-gap:38px;row-gap:12px;justify-content:center;align-items:start}
+  .copilot-hub-group{position:relative;z-index:1;width:100%;padding:13px 15px;border:1px solid #33465d;border-radius:8px;background:#152438}
+  .copilot-hub-group.custom{grid-area:custom}.copilot-hub-group.tools{grid-area:tools}.copilot-hub-group.agentic{grid-area:agent}.copilot-hub-group.models{grid-area:models}
+  .copilot-hub-title{margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid #33465d;color:#bfe8ff;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.7px}
+  .copilot-hub-list{display:grid;grid-template-columns:1fr;gap:4px}
+  .copilot-hub-item{min-width:0;display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px;background:#1c3048;color:inherit;text-decoration:none}
+  .copilot-hub-item:hover b,.copilot-hub-item:focus-visible b{color:#6ec8ff}
+  .copilot-hub-item img{width:24px;height:24px;flex:0 0 auto;object-fit:contain;filter:invert(77%) sepia(15%) saturate(1399%) hue-rotate(169deg) brightness(105%) contrast(101%)}
+  .copilot-hub-item.awesome img,.copilot-hub-item img.brand-logo{filter:none}.copilot-hub-item b{display:block;color:#f8fafc;font-size:12px;line-height:1.15}.copilot-hub-item small{display:block;margin-top:2px;color:#9aabba;font-size:9.5px;line-height:1.2}
+  .copilot-hub-connectors{position:absolute;z-index:0;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+  .copilot-hub-connectors path{fill:none;stroke:#63748a;stroke-width:1.5;vector-effect:non-scaling-stroke}
+  .copilot-hub-connectors circle{fill:#8190a4}
+  .copilot-hub-center{--copilot-ring-size:clamp(160px,19vw,196px);--copilot-image-size:clamp(204px,24.2vw,250px);grid-area:center;position:relative;z-index:1;align-self:stretch;min-height:282px;overflow:hidden}
+  .copilot-hub-center:before,.copilot-hub-center:after{content:"";position:absolute;left:50%;top:50%;border-radius:50%;transform:translate(-50%,-50%)}.copilot-hub-center:before{width:calc(var(--copilot-ring-size) - 20px);height:calc(var(--copilot-ring-size) - 20px);border:10px solid #334d78;background:#000;box-shadow:0 0 34px rgba(63,112,255,.28)}.copilot-hub-center:after{width:var(--copilot-ring-size);height:var(--copilot-ring-size);border:1px solid #55729b}
+  .copilot-hub-center img{position:absolute;z-index:1;left:50%;top:50%;width:var(--copilot-image-size);height:auto;max-width:none;transform:translate(-50%,-56%);filter:drop-shadow(0 12px 22px rgba(70,70,255,.38))}
   .ws-command-strip{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(240px,.7fr);gap:10px;margin-top:14px}
   .ws-command-strip.single{grid-template-columns:1fr}
   .ws-command-strip code,.ws-outcome{padding:11px 13px;border-radius:8px}.ws-command-strip code{background:#0a1523;color:#c9f269;font-size:11px;overflow:auto}.ws-outcome{background:#113529;color:#86efac;font-size:11px;font-weight:800}
@@ -237,8 +252,8 @@
   .ws-footer{position:fixed;z-index:20;left:0;right:0;bottom:0;min-height:64px;display:flex;align-items:center;gap:14px;padding:10px 28px;background:#fff;border-top:1px solid var(--ws-line)}
   .ws-count{font-size:11px;font-weight:900;color:var(--ws-muted)}.ws-footer-note{font-size:11px;color:#7a878e}.ws-footer-space{flex:1}
   .ws-nav{width:38px;height:38px;border:1px solid var(--ws-line);background:#fff;color:var(--ws-ink);font-size:18px;cursor:pointer}.ws-nav.next{background:var(--ws-ink);color:#fff;border-color:var(--ws-ink)}.ws-nav:disabled{opacity:.3;cursor:not-allowed}
-  @media(max-width:900px){.ws-layout{grid-template-columns:1fr}.ws-journey{grid-template-columns:repeat(2,1fr)}.ws-platform{grid-template-columns:1fr}.ws-platform-arrow{transform:rotate(90deg)}.ws-top-meta{display:none}.ws-main{padding:20px 16px 100px}.ws-progress{padding:8px 12px}.ws-surface{min-height:0}.ws-cap-grid,.ws-cap-grid.sre-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ws-command-strip{grid-template-columns:1fr}}
-  @media(max-width:560px){.ws-top{padding:0 16px}.ws-brand small{display:none}.ws-journey{grid-template-columns:1fr}.ws-title{font-size:31px}.ws-row{grid-template-columns:1fr;gap:3px}.ws-footer-note{display:none}.ws-main{padding-left:12px;padding-right:12px}.ws-canvas{padding:14px}.ws-cap-grid{grid-template-columns:1fr 1fr}.ws-cap{min-height:104px;padding:11px}}
+  @media(max-width:900px){.ws-layout{grid-template-columns:1fr}.ws-journey{grid-template-columns:repeat(2,1fr)}.ws-platform{grid-template-columns:1fr}.ws-platform-arrow{transform:rotate(90deg)}.ws-top-meta{display:none}.ws-main{padding:20px 16px 100px}.ws-progress{padding:8px 12px}.ws-surface{min-height:0}.ws-cap-grid,.ws-cap-grid.sre-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.copilot-hub{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"center center" "custom agent" "tools models";column-gap:12px}.copilot-hub-connectors{display:none}.copilot-hub-center{min-height:210px}.ws-command-strip{grid-template-columns:1fr}}
+  @media(max-width:560px){.ws-top{padding:0 16px}.ws-brand small{display:none}.ws-journey{grid-template-columns:1fr}.ws-title{font-size:31px}.ws-row{grid-template-columns:1fr;gap:3px}.ws-footer-note{display:none}.ws-main{padding-left:12px;padding-right:12px}.ws-canvas{padding:14px}.ws-cap-grid{grid-template-columns:1fr 1fr}.ws-cap{min-height:104px;padding:11px}.copilot-hub{grid-template-columns:1fr;grid-template-areas:"center" "custom" "agent" "tools" "models"}.copilot-hub-list{grid-template-columns:1fr}.copilot-hub-center{min-height:190px}}
 
   /* Original storyboard theme */
   :root{
@@ -252,7 +267,7 @@
   .ws-step{height:32px;padding:0 12px;border:1px solid var(--ws-line);border-radius:999px;background:#fff;color:var(--ws-muted);transition:.18s}
   .ws-step b{width:9px;height:9px;border:0;background:#cbd5e1;color:transparent}
   .ws-step:hover{border-color:#cbd5e1}.ws-step.active{color:#fff;border-color:transparent;border-bottom-color:transparent;background:#0078d4}
-  .ws-step:nth-child(3).active,.ws-step:nth-child(4).active{background:#0078d4}.ws-step:nth-child(5).active{background:#24292f}
+  .ws-step:nth-child(3).active,.ws-step:nth-child(4).active{background:#0078d4}.ws-step:nth-child(5).active{background:#975DCA}
   .ws-step:nth-child(6).active{background:#10b981}.ws-step:nth-child(7).active{background:#f59e0b}
   .ws-step.active b{width:9px;height:9px;background:rgba(255,255,255,.9);color:transparent}.ws-step.done b{width:9px;height:9px;background:#16a34a;color:transparent}
   .ws-main{max-width:1120px;padding-top:26px}
@@ -673,8 +688,8 @@
     {label:'Introduction',title:'Evolving DevOps',accent:'#2f9e44'},
     {label:'Agentic Platform',title:'Microsoft Agentic SDLC',accent:'#0078d4'},
     {label:'Platform lifecycle',title:'From spec to prod',accent:'#0078d4'},
-    {label:'GitHub Copilot',title:'Equip Copilot with architecture expertise',accent:'#0078d4'},
-    {label:'GH Platform',title:'GitHub powers the agentic SDLC',accent:'#24292f'},
+    {label:'GitHub Copilot',title:'Supercharge your IDE',accent:'#0078d4'},
+    {label:'GH Platform',title:'GitHub powers the agentic SDLC',accent:'#975DCA'},
     {label:'Foundry',title:'Add intelligence with Microsoft Foundry',accent:'#008f7a'},
     {label:'SRE Agent',title:'Amplify operations with Azure SRE Agent',accent:'#e86a17'}
   ];
@@ -682,7 +697,7 @@
     '',
     'One platform of agents and services spanning intent, build and operations.',
     '',
-    'Skills, prompts and instructions turn team practice into reusable capability.',
+    'The same Copilot capabilities, organized around one connected developer experience.',
     'Coding, review and security agents converge on the pull request.',
     'Models, knowledge, tools and governance in one control plane.',
     'Investigate, mitigate and prevent incidents with intelligent automation.'
@@ -771,29 +786,40 @@
     </div>
   </section>`;
 
-  const skillBody=`<div class="ws-product"><img class="ws-product-image" src="demo/storyboard-assets/copilot-agent.png" alt="GitHub Copilot"><div><h2>GitHub Copilot · customization stack</h2><p>Team context becomes reusable capability inside the IDE.</p></div></div>
-    <div class="ws-cap-label">Team customization</div>
-    <div class="ws-cap-grid copilot-grid">
-      <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-skills.svg" alt=""></span><div><b>Skills</b><small>Expertise on demand</small></div></div>
-      <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-prompt-files.svg" alt=""></span><div><b>Prompt files</b><small>Repeatable workflows</small></div></div>
-      <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-instructions.svg" alt=""></span><div><b>Instructions</b><small>Always-on standards</small></div></div>
-      <a class="ws-cap primary awesome ws-cap-link" href="https://github.com/github/awesome-copilot" target="_blank" rel="noreferrer"><span class="ws-cap-icon"><img src="demo/storyboard-assets/github-mark.svg" alt="GitHub"></span><div><b>Awesome Copilot</b><small>Community catalog</small></div></a>
-    </div>
-    <div class="ws-cap-arrow">↓</div>
-    <div class="ws-cap-grid copilot-grid">
-      <div class="ws-cap"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-tools-mcp.svg" alt=""></span><div><b>Tools</b><small>GitHub · Azure · Playwright</small></div></div>
-      <div class="ws-cap"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-agent-mode.svg" alt=""></span><div><b>Agent Mode</b><small>Plan · edit · validate</small></div></div>
-      <div class="ws-cap"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-models.svg" alt=""></span><div><b>Models</b><small>Choice per task</small></div></div>
-      <div class="ws-cap"><span class="ws-cap-icon"><img src="demo/storyboard-assets/copilot-custom-agents.svg" alt=""></span><div><b>Custom Agents</b><small>Specialized teammates</small></div></div>
-    </div>
-    <div class="ws-command-strip single"><code>$ gh skills install github/awesome-copilot azure-architecture-autopilot</code></div>`;
+  const skillHubBody=`<div class="copilot-hub">
+    <svg class="copilot-hub-connectors" viewBox="0 0 1000 400" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M342 88 H370 L403 130"></path><circle cx="342" cy="88" r="4"></circle><circle cx="403" cy="130" r="4"></circle>
+      <path d="M342 312 H370 L403 270"></path><circle cx="342" cy="312" r="4"></circle><circle cx="403" cy="270" r="4"></circle>
+      <path d="M658 88 H630 L597 130"></path><circle cx="658" cy="88" r="4"></circle><circle cx="597" cy="130" r="4"></circle>
+      <path d="M658 312 H630 L597 270"></path><circle cx="658" cy="312" r="4"></circle><circle cx="597" cy="270" r="4"></circle>
+    </svg>
+    <section class="copilot-hub-group custom"><div class="copilot-hub-title">Team customization</div><div class="copilot-hub-list">
+      <div class="copilot-hub-item"><img src="demo/storyboard-assets/copilot-skills.svg" alt=""><div><b>Skills</b><small>Expertise on demand</small></div></div>
+      <div class="copilot-hub-item"><img src="demo/storyboard-assets/copilot-prompt-files.svg" alt=""><div><b>Prompt files</b><small>Repeatable workflows</small></div></div>
+      <div class="copilot-hub-item"><img src="demo/storyboard-assets/copilot-instructions.svg" alt=""><div><b>Instructions</b><small>Always-on standards</small></div></div>
+    </div></section>
+    <section class="copilot-hub-group tools"><div class="copilot-hub-title">Model Context Protocol (MCP)</div><div class="copilot-hub-list">
+      <div class="copilot-hub-item"><img class="brand-logo" src="demo/storyboard-assets/github-mark.svg" alt=""><div><b>GitHub</b></div></div>
+      <div class="copilot-hub-item"><img class="brand-logo" src="demo/storyboard-assets/playwright.png" alt=""><div><b>Playwright</b></div></div>
+      <div class="copilot-hub-item"><img class="brand-logo" src="demo/storyboard-assets/azure.svg" alt=""><div><b>Azure</b></div></div>
+    </div></section>
+    <div class="copilot-hub-center"><img src="demo/storyboard-assets/copilot.png" alt="GitHub Copilot"></div>
+    <section class="copilot-hub-group agentic"><div class="copilot-hub-title">Agentic features</div><div class="copilot-hub-list">
+      <div class="copilot-hub-item"><img src="demo/storyboard-assets/copilot-agent-mode.svg" alt=""><div><b>Agent Mode</b><small>Plan · edit · validate</small></div></div>
+      <div class="copilot-hub-item"><img src="demo/storyboard-assets/copilot-custom-agents.svg" alt=""><div><b>Custom Agents</b><small>Specialized teammates</small></div></div>
+    </div></section>
+    <section class="copilot-hub-group models"><div class="copilot-hub-title">Extensibility and choice</div><div class="copilot-hub-list">
+      <div class="copilot-hub-item"><img src="demo/storyboard-assets/copilot-models.svg" alt=""><div><b>Models</b><small>Choice per task</small></div></div>
+      <a class="copilot-hub-item awesome" href="https://github.com/github/awesome-copilot" target="_blank" rel="noreferrer"><img src="demo/storyboard-assets/github-mark.svg" alt="GitHub"><div><b>Awesome Copilot</b><small>Community catalog</small></div></a>
+    </div></section>
+  </div><div class="ws-command-strip single"><code>$ gh skills install github/awesome-copilot azure-architecture-autopilot</code></div>`;
 
   const issueBody=`<div class="ws-product"><img class="ws-product-image" src="demo/storyboard-assets/github-mark.svg" alt="GitHub"><div><h2>GitHub Platform</h2><p>Build, review and secure with specialized agents.</p></div></div>
     <div class="ws-cap-grid">
       <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/coding-agent.svg" alt=""></span><div><b>Coding Agent</b><small>Issue → pull request</small></div></div>
       <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/review-agent.svg" alt=""></span><div><b>Review Agent</b><small>Code-aware feedback</small></div></div>
       <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/autofix.svg" alt=""></span><div><b>Autofix</b><small>Vulnerability → patch</small></div></div>
-      <div class="ws-cap primary awesome"><span class="ws-cap-icon"><img src="demo/storyboard-assets/ghas.svg" alt=""></span><div><b>GitHub Advanced Security</b><small>Code · secrets · supply chain</small></div></div>
+      <div class="ws-cap primary"><span class="ws-cap-icon"><img src="demo/storyboard-assets/ghas.svg" alt=""></span><div><b>GitHub Advanced Security</b><small>Code · secrets · supply chain</small></div></div>
     </div>
     <div class="ws-flowline"><span>GitHub Issue</span><i>→</i><span>Agentic build</span><i>→</i><span>Review + security</span><i>→</i><span>Pull request</span></div>`;
 
@@ -836,7 +862,7 @@
     <div class="ws-actions"><button class="ws-action" id="approve-fix" onclick="approveFix()">Review and merge</button><span id="fix-result" class="ws-chip">Human approval required</span></div>`;
 
   const pages=[introduction,agenticPlatform,overview,
-    shell(3,'Step 1 · Specify','','Visual Studio Code · GitHub Copilot',skillBody),
+    shell(3,'Step 1 · Specify','','Visual Studio Code · GitHub Copilot',skillHubBody),
     shell(4,'Step 2 · Build','','GitHub Platform · Agentic SDLC',issueBody),
     shell(5,'Step 3 · Reason','','Microsoft Foundry · buildingassist project',foundryBody),
     shell(6,'Step 4 · Operate + Diagnose','','Azure SRE Agent · incident investigator',sreIntroBody)];

@@ -44,6 +44,10 @@ param modelName string = 'model-router'
 param modelVersion string = '2025-11-18'
 param modelCapacity int = 30
 
+@description('Existing deployment name used by the Foundry IQ Knowledge Base.')
+param knowledgeModelDeploymentName string = 'gpt-5-mini'
+param knowledgeModelName string = 'gpt-5-mini'
+
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: accountName
   location: location
@@ -159,6 +163,9 @@ output modelDeploymentName string = modelDeployment.name
 output modelDeploymentId string = modelDeployment.id
 output modelVersion string = modelVersion
 output modelCapacity int = modelCapacity
+output knowledgeModelDeploymentName string = knowledgeModelDeploymentName
+output knowledgeModelName string = knowledgeModelName
+output knowledgeModelResourceUri string = 'https://${account.name}.openai.azure.com'
 output knowledgeConnectionName string = knowledgeConnection.name
 output searchConnectionName string = searchConnection.name
 output appInsightsConnectionName string = appInsightsConnection.name

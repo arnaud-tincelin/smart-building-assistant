@@ -245,6 +245,7 @@ module rbac 'modules/rbac.bicep' = {
     appInsightsName: monitoring.outputs.appInsightsName
     appPrincipalId: identity.outputs.principalId
     foundryProjectPrincipalId: foundry.outputs.projectPrincipalId
+    searchPrincipalId: search.outputs.principalId
     developerPrincipalId: deployer().objectId
   }
 }
@@ -275,6 +276,9 @@ output AZURE_AI_PROJECT_ENDPOINT string = foundry.outputs.projectEndpoint
 output AZURE_AI_PROJECT_ID string = foundry.outputs.projectId
 output AZURE_AI_ACCOUNT_NAME string = foundry.outputs.accountName
 output AZURE_AI_MODEL_DEPLOYMENT string = foundry.outputs.modelDeploymentName
+output BUILDINGASSIST_KNOWLEDGE_MODEL_DEPLOYMENT string = foundry.outputs.knowledgeModelDeploymentName
+output BUILDINGASSIST_KNOWLEDGE_MODEL_NAME string = foundry.outputs.knowledgeModelName
+output BUILDINGASSIST_KNOWLEDGE_MODEL_RESOURCE_URI string = foundry.outputs.knowledgeModelResourceUri
 output APPLICATIONINSIGHTS_RESOURCE_ID string = monitoring.outputs.appInsightsId
 output APPLICATIONINSIGHTS_NAME string = monitoring.outputs.appInsightsName
 output APPLICATIONINSIGHTS_CONNECTION_NAME string = foundry.outputs.appInsightsConnectionName
