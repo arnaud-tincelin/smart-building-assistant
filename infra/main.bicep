@@ -197,6 +197,10 @@ module backend 'modules/container-app.bicep' = {
         value: 'true'
       }
       {
+        name: 'BUILDINGASSIST_OPERATIONS_SOURCE'
+        value: 'simulator'
+      }
+      {
         name: 'AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING'
         value: 'true'
       }
@@ -258,13 +262,15 @@ module sreAgent 'modules/sre-agent.bicep' = {
     agentName: 'sre-${resourceToken}'
     identityName: '${abbrs.identity}-sre-${resourceToken}'
     actionGroupName: 'ag-sre-${resourceToken}'
-    alertName: 'alert-backend-5xx-${resourceToken}'
+    legacyAlertName: 'alert-backend-5xx-${resourceToken}'
+    securityAlertName: 'alert-security-5xx-${resourceToken}'
+    configAlertName: 'alert-config-availability-${resourceToken}'
     developerPrincipalId: deployer().objectId
     appInsightsAppId: monitoring.outputs.appInsightsAppId
     appInsightsResourceId: monitoring.outputs.appInsightsId
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     logAnalyticsName: monitoring.outputs.logAnalyticsName
-    backendAppId: backend.outputs.appId
+    backendAppName: backendAppName
   }
 }
 
@@ -296,6 +302,7 @@ output AI_GATEWAY_API_KEY_RESOURCE_ID string = apim.outputs.runtimeApiKeyId
 output AI_GATEWAY_CONNECTOR_NAMESPACE_RESOURCE_ID string = apim.outputs.connectorNamespaceId
 output AI_GATEWAY_TELEMETRY_EXPORTER_RESOURCE_ID string = '${apim.outputs.apimId}/workspaces/default/telemetryExporters/appinsights'
 output BUILDINGASSIST_OPERATIONS_API_URL string = '${backendUrl}/operations'
+output BACKEND_CONTAINER_APP_NAME string = backendAppName
 output BUILDINGASSIST_MCP_SERVER_URL string = apim.outputs.operationsMcpEndpoint
 output BUILDINGASSIST_MCP_CONNECTION string = operationsMcpConnection.outputs.connectionName
 output SRE_AGENT_NAME string = sreAgent.outputs.agentName

@@ -3,10 +3,10 @@ Azure SRE Agent (Microsoft.App/agents) — the operate pillar, now first-class i
 Bicep. Provisions the agent with system-assigned and user-assigned identities,
 scoped read access to the resource group + Log Analytics, persistent App Insights
 and Log Analytics connectors, an Action Group as the incident entry point, and a
-metric alert on the backend that fires the staged regression into the agent.
+pair of trace alerts that route code and deployment faults independently.
 
-GitHub connection (open issues) and the incident-handler subagent/runbook are still
-configured in the agent Builder (data plane) post-provision — see docs/sre-agent.md.
+GitHub connection, handlers, response plans, and repair skills are configured in
+the agent Builder data plane post-provision — see docs/sre-agent.md.
 '''
 
 param location string
@@ -14,7 +14,9 @@ param tags object
 param agentName string
 param identityName string
 param actionGroupName string
-param alertName string
+param legacyAlertName string
+param securityAlertName string
+param configAlertName string
 
 @description('Principal ID that receives SRE Agent Administrator access in the agent portal.')
 param developerPrincipalId string
@@ -32,16 +34,21 @@ param appInsightsConnectionString string
 @description('Log Analytics workspace name — the agent gets Reader on it to run KQL.')
 param logAnalyticsName string
 
-@description('Backend Container App resource id — scope of the regression metric alert.')
-param backendAppId string
+@description('Backend Container App name — the only resource the action identity may modify.')
+param backendAppName string
 
 var readerRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
 var monitoringReaderRoleId = '43d0d8ad-25c7-4714-9337-8ba259a9fe05'
 var logAnalyticsReaderRoleId = '73c42c96-874c-492b-b04d-ab87d138a893'
+var containerAppsContributorRoleId = '358470bc-b998-42bd-ab17-a7e34c199c0f'
 var sreAgentAdministratorRoleId = 'e79298df-d852-4c6d-84f9-5d13249d1e55'
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: logAnalyticsName
+}
+
+resource backendApp 'Microsoft.App/containerApps@2024-03-01' existing = {
+  name: backendAppName
 }
 
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
@@ -79,6 +86,17 @@ resource logAnalyticsReaderAssignment 'Microsoft.Authorization/roleAssignments@2
   scope: logAnalytics
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', logAnalyticsReaderRoleId)
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// The action identity can repair deployment configuration on the backend only.
+resource backendContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(backendApp.id, identity.id, containerAppsContributorRoleId)
+  scope: backendApp
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', containerAppsContributorRoleId)
     principalId: identity.properties.principalId
     principalType: 'ServicePrincipal'
   }
@@ -226,21 +244,21 @@ resource sreAgentAdministratorAssignment 'Microsoft.Authorization/roleAssignment
   }
 }
 
-// Any backend 5xx, including the access-control demo regression, enters the
-// Azure Monitor incident platform watched by the SRE Agent.
-resource backendErrorAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
-  name: alertName
+// Incremental deployments do not delete the former broad 5xx alert. Keep its
+// original resource name declared and disabled so upgrades cannot emit duplicate incidents.
+resource legacyBackendErrorAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
+  name: legacyAlertName
   location: 'global'
   tags: tags
   properties: {
-    description: 'BuildingAssist backend is returning 5xx responses. Correlate Application Insights failures with connected source code.'
+    description: 'Deprecated broad backend 5xx alert; replaced by scenario-specific log alerts.'
     severity: 2
-    enabled: true
+    enabled: false
     scopes: [
-      backendAppId
+      backendApp.id
     ]
     evaluationFrequency: 'PT1M'
-    windowSize: 'PT15M'
+    windowSize: 'PT5M'
     criteria: {
       'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
       allOf: [
@@ -264,11 +282,85 @@ resource backendErrorAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
         }
       ]
     }
-    actions: [
-      {
-        actionGroupId: actionGroup.id
-      }
+    actions: []
+  }
+}
+
+// Scenario 1: the staged access-control code defect returns HTTP 500.
+resource backendSecurityErrorAlert 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview' = {
+  name: securityAlertName
+  location: location
+  tags: tags
+  properties: {
+    displayName: securityAlertName
+    description: 'BuildingAssist security operations are returning HTTP 500 responses.'
+    severity: 2
+    enabled: true
+    scopes: [
+      logAnalytics.id
     ]
+    evaluationFrequency: 'PT1M'
+    windowSize: 'PT5M'
+    skipQueryValidation: true
+    autoMitigate: true
+    criteria: {
+      allOf: [
+        {
+          query: 'AppTraces | where AppRoleName == "buildingassist-backend" | where Message has "Security control operation failed"'
+          timeAggregation: 'Count'
+          operator: 'GreaterThan'
+          threshold: 0
+          failingPeriods: {
+            numberOfEvaluationPeriods: 1
+            minFailingPeriodsToAlert: 1
+          }
+        }
+      ]
+    }
+    actions: {
+      actionGroups: [
+        actionGroup.id
+      ]
+    }
+  }
+}
+
+// Scenario 2: an invalid deployment setting returns traced HTTP 503 responses.
+resource backendConfigErrorAlert 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview' = {
+  name: configAlertName
+  location: location
+  tags: tags
+  properties: {
+    displayName: configAlertName
+    description: 'BuildingAssist is unavailable because the deployed runtime configuration is invalid.'
+    severity: 1
+    enabled: true
+    scopes: [
+      logAnalytics.id
+    ]
+    evaluationFrequency: 'PT1M'
+    windowSize: 'PT5M'
+    skipQueryValidation: true
+    autoMitigate: true
+    criteria: {
+      allOf: [
+        {
+          query: 'AppTraces | where AppRoleName == "buildingassist-backend" | where Message has "CONFIG_ERROR"'
+          timeAggregation: 'Count'
+          operator: 'GreaterThan'
+          threshold: 0
+          failingPeriods: {
+            numberOfEvaluationPeriods: 1
+            minFailingPeriodsToAlert: 1
+          }
+        }
+      ]
+    }
+    actions: {
+      actionGroups: [
+        actionGroup.id
+      ]
+    }
   }
 }
 

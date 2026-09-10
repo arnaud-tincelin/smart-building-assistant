@@ -32,6 +32,22 @@ def test_healthz(client: TestClient) -> None:
     assert resp.json() == {"status": "ok"}
 
 
+def test_invalid_operations_source_returns_diagnosable_503(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr("app.main.settings.operations_source", "digital-twins-prod")
+    caplog.set_level("ERROR", logger="buildingassist.api")
+
+    response = client.get("/healthz", headers={"Origin": "https://frontend.example"})
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "invalid_runtime_configuration"
+    assert response.headers["access-control-allow-origin"] == "*"
+    assert any("CONFIG_ERROR" in record.message for record in caplog.records)
+
+
 def test_ask_returns_answer_and_citations(client: TestClient) -> None:
     resp = client.post("/ask", json={"question": "How much energy did Floor 3 use this week?"})
     assert resp.status_code == 200

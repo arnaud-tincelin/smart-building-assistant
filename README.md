@@ -193,9 +193,10 @@ The full Foundry IQ and MCP walkthrough is in
 ### Attach the Azure SRE Agent (operate pillar)
 
 The SRE Agent (`Microsoft.App/agents`), its scoped identity, an Action Group, and a
-backend 5xx metric alert are **provisioned by Bicep**. The post-provision hook adds
-the security incident handler, Sev2 response plan, and Code Access when GitHub OAuth
-has been authorized. Rehearse the badge/visitor regression in
+pair of exact 500/503 trace alerts are **provisioned by Bicep**. The post-provision hook
+adds a read-only code investigator, a backend-scoped configuration operator, their
+response plans and repair skill, plus Code Access when GitHub OAuth has been
+authorized. Rehearse both repair paths in
 [docs/sre-agent.md](docs/sre-agent.md).
 
 ## Demo run-sheet (maps to the one-hour beats)
@@ -205,11 +206,12 @@ has been authorized. Rehearse the badge/visitor regression in
 | 0:05–0:17 | **Write** | Copilot agent mode builds the `/ask` feature (this repo) | 🟦 Copilot |
 | 0:17–0:31 | **Reason** | Model Router + Foundry IQ retrieval + MCP read/action approval | 🟩 Foundry |
 | 0:31–0:38 | **Operate** | SRE Agent config — resources watched, GitHub link | 🟧 SRE Agent |
-| 0:38–0:48 | **Diagnose** | Badge access returns 500 → SRE Agent RCA → GitHub issue | 🟧 SRE Agent |
-| 0:48–0:57 | **Fix** | Assign issue → Copilot coding agent PR → **review & merge** → redeploy | 🟦 Copilot (HITL) |
+| 0:38–0:43 | **Auto-repair** | Bad Container App config → traced 503 → SRE Agent restores baseline | 🟧 SRE Agent |
+| 0:43–0:50 | **Diagnose** | Badge access returns 500 → SRE Agent RCA → GitHub issue | 🟧 SRE Agent |
+| 0:50–0:57 | **Fix** | Assign issue → Copilot coding agent PR → **review & merge** → redeploy | 🟦 Copilot (HITL) |
 | 0:57–1:00 | **Close** | One platform, governed (APIM AI Gateway + Agent 365) | — |
 
-The staged regression and repair loop are in [docs/sre-agent.md](docs/sre-agent.md#4-trigger-the-security-regression).
+The staged regressions and repair loops are in [docs/sre-agent.md](docs/sre-agent.md).
 
 ## Teardown
 
@@ -217,7 +219,7 @@ The staged regression and repair loop are in [docs/sre-agent.md](docs/sre-agent.
 azd down --purge --force
 ```
 
-Delete the SRE Agent separately (it's provisioned outside this repo's Bicep).
+The SRE Agent is part of the Bicep deployment and is removed with the environment.
 
 ## Repository layout
 

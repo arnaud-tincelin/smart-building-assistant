@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     # CORS: comma-separated list of allowed frontend origins. "*" allows all.
     allowed_origins: str = "*"
 
+    # Runtime provider selected by deployment configuration. The demo supports
+    # only the in-memory simulator; any other value is a platform fault.
+    operations_source: str = "simulator"
+
     # When true, skip the real Foundry call and return a canned answer. Handy for
     # local development and tests without Azure credentials.
     use_mock_agent: bool = False

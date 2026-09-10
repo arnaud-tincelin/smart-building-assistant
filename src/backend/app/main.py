@@ -29,6 +29,35 @@ app = FastAPI(
     summary="A minimal Smart Building assistant backed by an Azure AI Foundry agent.",
 )
 
+app.include_router(operations_router)
+
+
+@app.middleware("http")
+async def _require_supported_operations_source(
+    request: Request,
+    call_next: Callable,
+) -> JSONResponse:
+    if settings.operations_source != "simulator":
+        logger.error(
+            "CONFIG_ERROR unsupported operations source: source=%s path=%s",
+            settings.operations_source,
+            request.url.path,
+            extra={"operations_source": settings.operations_source},
+        )
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": {
+                    "code": "invalid_runtime_configuration",
+                    "message": (
+                        "Building operations are unavailable due to deployment configuration."
+                    ),
+                }
+            },
+        )
+    return await call_next(request)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins_list,
@@ -36,8 +65,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
-
-app.include_router(operations_router)
 
 
 @app.exception_handler(ValueError)
