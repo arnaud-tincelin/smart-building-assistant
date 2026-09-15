@@ -65,3 +65,14 @@ def test_foundry_iq_knowledge_base_has_explicit_retrieval_settings() -> None:
 
     assert payload["retrievalReasoningEffort"] == {"kind": "low"}
     assert payload["outputMode"] == "extractiveData"
+
+
+def test_foundry_iq_mcp_endpoint_uses_knowledge_base_preview_api() -> None:
+    module = _load_setup_module()
+
+    endpoint = module._knowledge_mcp_endpoint("https://search.example.test/")
+
+    assert endpoint == (
+        "https://search.example.test/knowledgebases/buildingassist-knowledge/mcp"
+        "?api-version=2026-08-01-preview"
+    )

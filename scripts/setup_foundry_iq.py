@@ -33,6 +33,7 @@ from azure.search.documents.indexes.models import (
 
 SEARCH_API_VERSION = "2026-04-01"
 KNOWLEDGE_BASE_API_VERSION = "2026-08-01-preview"
+KNOWLEDGE_MCP_API_VERSION = KNOWLEDGE_BASE_API_VERSION
 INDEX_NAME = os.environ.get(
     "BUILDINGASSIST_SEARCH_INDEX_NAME", "buildingassist-docs")
 KNOWLEDGE_SOURCE_NAME = os.environ.get(
@@ -160,6 +161,14 @@ def _knowledge_base_preview_payload(document: dict) -> dict:
     return document
 
 
+def _knowledge_mcp_endpoint(endpoint: str) -> str:
+    knowledge_base_name = urllib.parse.quote(KNOWLEDGE_BASE_NAME, safe="")
+    return (
+        f"{endpoint.rstrip('/')}/knowledgebases/{knowledge_base_name}/mcp"
+        f"?api-version={KNOWLEDGE_MCP_API_VERSION}"
+    )
+
+
 def _apply_knowledge_base_preview_settings(
     endpoint: str, credential: DefaultAzureCredential
 ) -> None:
@@ -229,7 +238,7 @@ def main() -> int:
         f"Created or updated Foundry IQ knowledge base {KNOWLEDGE_BASE_NAME!r}.")
     print(
         "BUILDINGASSIST_KNOWLEDGE_MCP_ENDPOINT="
-        f"{endpoint}/knowledgebases/{KNOWLEDGE_BASE_NAME}/mcp?api-version={SEARCH_API_VERSION}"
+        f"{_knowledge_mcp_endpoint(endpoint)}"
     )
     return 0
 

@@ -103,7 +103,7 @@ module search 'modules/search.bicep' = {
 }
 
 var knowledgeBaseName = 'buildingassist-knowledge'
-var knowledgeMcpEndpoint = '${search.outputs.endpoint}/knowledgebases/${knowledgeBaseName}/mcp?api-version=2026-04-01'
+var knowledgeMcpEndpoint = '${search.outputs.endpoint}/knowledgebases/${knowledgeBaseName}/mcp?api-version=2026-08-01-preview'
 
 module foundry 'modules/foundry.bicep' = {
   scope: resourceGroup
