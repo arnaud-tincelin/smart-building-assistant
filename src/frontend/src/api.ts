@@ -33,6 +33,18 @@ export interface SecurityOperationResponse {
   id: string;
 }
 
+export type RoutingMode = "balanced" | "cost" | "quality";
+
+export interface RoutingModeState {
+  mode: RoutingMode;
+  editable: boolean;
+  explicitly_set?: boolean;
+  model_name?: string;
+  model_version?: string;
+  model_subset?: string[];
+  propagation_seconds?: number;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
