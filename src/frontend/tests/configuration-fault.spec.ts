@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-for (const mode of ["Foundry", "AI Gateway"]) {
+for (const mode of ["Agents", "AI Gateway"]) {
   test(`${mode} displays a configuration fault and recovers on retry`, async ({ page }, testInfo) => {
     await page.route("**/model-router/mode", (route) => route.fulfill({
       json: { mode: "balanced", editable: false, explicitly_set: false },
@@ -29,5 +29,25 @@ for (const mode of ["Foundry", "AI Gateway"]) {
     await page.getByRole("button", { name: "Ask", exact: true }).click();
     await expect(page.getByText("Building operations recovered.", { exact: true })).toBeVisible();
     await expect(page.getByText(/Reference: CFG-TEST/)).toHaveCount(0);
+  });
+
+  test(`${mode} shows throttling clearly and keeps retry available`, async ({ page }) => {
+    await page.route("**/model-router/mode", (route) => route.fulfill({
+      json: { mode: "balanced", editable: false },
+    }));
+    await page.route("**/ask", (route) => route.fulfill({
+      status: 429,
+      headers: { "Retry-After": "21" },
+      json: { detail: "The model is rate-limited. Retry after 21s." },
+    }));
+    await page.goto("/");
+    await page.getByRole("button", { name: mode, exact: true }).click();
+    const question = page.getByRole("textbox", { name: "Building question" });
+    await question.fill("List the Contoso buildings.");
+    await page.getByRole("button", { name: "Ask", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("rate-limited. Retry after 21s.");
+    await expect(page.getByRole("button", { name: "Ask", exact: true })).toBeEnabled();
+    await expect(question).toHaveValue("List the Contoso buildings.");
+    await expect(page.locator(".answer")).toHaveCount(0);
   });
 }

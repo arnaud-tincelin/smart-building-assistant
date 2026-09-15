@@ -19,6 +19,10 @@ param external bool
 @description('Plain environment variables passed to the container.')
 param env array = []
 
+@secure()
+@description('Optional AI Gateway runtime key for the backend, stored as a Container App secret.')
+param gatewayApiKey string = ''
+
 @description('The azd service name tag so azd can match and deploy to this app.')
 param serviceName string
 
@@ -41,6 +45,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     managedEnvironmentId: environmentId
     configuration: {
       activeRevisionsMode: 'Single'
+      secrets: empty(gatewayApiKey) ? [] : [
+        {
+          name: 'ai-gateway-key'
+          value: gatewayApiKey
+        }
+      ]
       ingress: {
         external: external
         targetPort: targetPort

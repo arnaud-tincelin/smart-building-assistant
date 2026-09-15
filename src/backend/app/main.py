@@ -12,8 +12,17 @@ from fastapi.responses import JSONResponse
 
 from .building_operations import operations
 from .config import settings
-from .foundry_client import get_client
-from .models import AccessRequest, AskRequest, AskResponse, VisitorCheckInRequest
+from .foundry_client import FoundryRateLimitError, get_client
+from .gateway_client import GatewayError, get_gateway_client
+from .model_router import RouterControlError, get_admin
+from .models import (
+    AccessRequest,
+    AskRequest,
+    AskResponse,
+    RoutingModeRequest,
+    RoutingModeState,
+    VisitorCheckInRequest,
+)
 from .operations_api import router as operations_router
 from .telemetry import configure_tracing
 
@@ -62,7 +71,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins_list,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -81,14 +90,45 @@ def healthz() -> dict[str, str]:
 
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
-    """Answer a building energy question using the Foundry agent."""
+    """Use the single Foundry agent or the explicitly selected AI Gateway path."""
     try:
-        answer, citations = get_client().ask(request.question)
+        if request.mode == "gateway":
+            return get_gateway_client().ask(request.question)
+        return get_client().ask(request.question)
+    except GatewayError as exc:
+        logger.warning("AI Gateway call failed: %s", exc)
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+    except FoundryRateLimitError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail=str(exc),
+            headers={"Retry-After": exc.retry_after} if exc.retry_after else None,
+        ) from exc
     except RuntimeError as exc:
         logger.exception("Foundry agent call failed")
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    return AskResponse(answer=answer, citations=citations)
+
+@app.get("/model-router/mode", response_model=RoutingModeState)
+def get_routing_mode() -> RoutingModeState:
+    """Read the shared deployment's configuration, not a per-request routing decision."""
+    try:
+        return get_admin().get_mode()
+    except RouterControlError as exc:
+        logger.warning("Could not read the Model Router configuration: %s", exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.put("/model-router/mode", response_model=RoutingModeState)
+def set_routing_mode(request: RoutingModeRequest) -> RoutingModeState:
+    """Update the shared router only when this deployment explicitly permits editing."""
+    if not settings.enable_router_control:
+        raise HTTPException(status_code=403, detail="Routing is read-only in this environment.")
+    try:
+        return get_admin().set_mode(request.mode)
+    except RouterControlError as exc:
+        logger.warning("Could not update the Model Router configuration: %s", exc)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 def _security_failure(

@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from functools import lru_cache
@@ -26,10 +26,12 @@ import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.types import PaginatedRequestParams
+from pydantic import ValidationError
 
 from .agent_policy import READ_ONLY_MCP_TOOLS
 from .config import settings
-from .models import AskResponse, ModelExecution, TokenUsage
+from .execution import describe_execution
+from .models import AskResponse, TokenUsage
 
 logger = logging.getLogger("buildingassist.gateway")
 
@@ -76,7 +78,7 @@ def _gateway_error(exc: BaseException) -> GatewayError | None:
 
 
 @asynccontextmanager
-async def open_tool_session(endpoint: str, api_key: str) -> AsyncIterator[ClientSession]:
+async def open_tool_session(endpoint: str, api_key: str) -> AsyncGenerator[ClientSession]:
     try:
         async with (
             httpx.AsyncClient(headers={"Api-Key": api_key}, timeout=30) as http_client,
@@ -154,7 +156,9 @@ class GatewayModelClient:
     ) -> AskResponse:
         tools_used: list[str] = []
         call_count = 0
-        usage = TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0)
+        usage: TokenUsage | None = TokenUsage.model_validate({
+            field: 0 for field in TokenUsage.model_fields
+        })
         for round_index in range(MAX_TOOL_ROUNDS + 1):
             body: dict[str, Any] = {"model": self._model, "messages": messages}
             if tools:
@@ -164,19 +168,29 @@ class GatewayModelClient:
             latency_ms = round((perf_counter() - started_at) * 1000)
             response = self._to_response(payload, headers, latency_ms)
             execution = response.execution
-            if execution is not None and execution.usage is not None:
+            if execution is None or execution.usage is None:
+                usage = None
+            elif usage is not None:
+                counts = {}
                 for field, value in execution.usage.model_dump().items():
-                    setattr(usage, field, getattr(usage, field) + value)
+                    previous = getattr(usage, field)
+                    counts[field] = (
+                        previous + value if previous is not None and value is not None else None
+                    )
+                usage = TokenUsage.model_validate(counts)
             message = ((payload.get("choices") or [{}])[0].get("message") or {})
             calls = message.get("tool_calls") or []
             if not calls:
+                if not response.answer:
+                    raise GatewayError("AI Gateway returned no answer. Please retry.")
                 if execution is not None:
                     execution.usage = usage
                     execution.tools_used = tools_used
                     execution.routing_explanation += (
                         f" The backend made {round_index + 1} model call(s) and {call_count} "
                         "read-only MCP tool call(s) through AI Gateway. "
-                        "Token usage covers all model calls; the displayed model is the final one."
+                        "When available, token totals cover every call; "
+                        "model attribution comes from the final response."
                     )
                 return response
             if round_index == MAX_TOOL_ROUNDS or call_count + len(calls) > MAX_TOOL_CALLS:
@@ -218,23 +232,25 @@ class GatewayModelClient:
 
         try:
             with urlopen(request, timeout=60) as response:  # noqa: S310 - fixed gateway host
-                payload = json.loads(response.read() or b"{}")
-                headers = dict(response.headers)
+                payload = json.loads(response.read())
+                headers = {name.lower(): value for name, value in response.headers.items()}
         except HTTPError as exc:
             raise self._translate(exc) from exc
         except (URLError, TimeoutError) as exc:
             raise GatewayError("Could not reach the AI Gateway.") from exc
         except (ValueError, UnicodeDecodeError) as exc:
             raise GatewayError("AI Gateway returned an invalid model response.") from exc
+        if not isinstance(payload, dict):
+            raise GatewayError("AI Gateway returned an invalid model response.")
         return payload, headers
 
     @staticmethod
     def _translate(exc: HTTPError) -> GatewayError:
         detail = exc.read().decode(errors="replace")[:300]
         if exc.status == CONTENT_SAFETY_STATUS:
-            logger.info("AI Gateway blocked a prompt on content safety.")
+            logger.info("AI Gateway rejected a model request with 403.")
             return GatewayError(
-                "Blocked by the AI Gateway content safety policy before the model was called.",
+                "AI Gateway rejected the request under its access or content safety policy.",
                 status=CONTENT_SAFETY_STATUS,
             )
         if exc.status == RATE_LIMITED_STATUS:
@@ -247,51 +263,69 @@ class GatewayModelClient:
         return GatewayError(f"AI Gateway returned {exc.status}.")
 
     def _to_response(
-        self, payload: dict[str, Any], headers: dict[str, str], latency_ms: int
+        self, payload: dict[str, Any], headers: dict[str, str], latency_ms: int,
     ) -> AskResponse:
         choices = payload.get("choices") or []
-        answer = ""
-        if choices:
-            answer = ((choices[0].get("message") or {}).get("content") or "").strip()
-        if not answer:
-            answer = "The governed model did not return an answer."
+        if not choices or not isinstance(choices, list) or not isinstance(choices[0], dict):
+            raise GatewayError("AI Gateway returned an invalid model response.")
+        if choices[0].get("finish_reason") in ("length", "content_filter"):
+            raise GatewayError(
+                "AI Gateway returned an incomplete or filtered answer. Please retry."
+            )
+        message = choices[0].get("message")
+        if not isinstance(message, dict):
+            raise GatewayError("AI Gateway returned an invalid model response.")
+        content = message.get("content") or ""
+        if not isinstance(content, str):
+            raise GatewayError("AI Gateway returned an invalid answer.")
+        answer = content.strip()
 
-        usage_payload = payload.get("usage") or {}
-        usage = TokenUsage(
-            input_tokens=usage_payload.get("prompt_tokens", 0) or 0,
-            output_tokens=usage_payload.get("completion_tokens", 0) or 0,
-            total_tokens=usage_payload.get("total_tokens", 0) or 0,
-            reasoning_tokens=(usage_payload.get("completion_tokens_details") or {}).get(
-                "reasoning_tokens", 0
-            ) or 0,
-            cached_tokens=(usage_payload.get("prompt_tokens_details") or {}).get(
-                "cached_tokens", 0
-            ) or 0,
+        usage_payload = payload.get("usage")
+        usage = None
+        if usage_payload is not None and not isinstance(usage_payload, dict):
+            raise GatewayError("AI Gateway returned invalid token usage.")
+        if isinstance(usage_payload, dict):
+            input_details = usage_payload.get("prompt_tokens_details") or {}
+            output_details = usage_payload.get("completion_tokens_details") or {}
+            if not isinstance(input_details, dict) or not isinstance(output_details, dict):
+                raise GatewayError("AI Gateway returned invalid token usage details.")
+            try:
+                usage = TokenUsage(
+                    input_tokens=usage_payload.get("prompt_tokens"),
+                    output_tokens=usage_payload.get("completion_tokens"),
+                    total_tokens=usage_payload.get("total_tokens"),
+                    reasoning_tokens=output_details.get("reasoning_tokens"),
+                    cached_tokens=input_details.get("cached_tokens"),
+                    cache_write_tokens=input_details.get("cache_write_tokens"),
+                )
+            except ValidationError as exc:
+                raise GatewayError("AI Gateway returned invalid token usage.") from exc
+
+        reported_model = payload.get("model")
+        if reported_model is not None and not isinstance(reported_model, str):
+            raise GatewayError("AI Gateway returned an invalid model identifier.")
+        execution = describe_execution(
+            mode="gateway",
+            requested_model=self._model,
+            reported_model=reported_model,
+            routing_mode=None,
+            latency_ms=latency_ms,
+            response_id=payload.get("id"),
+            usage=usage,
+            tools_used=[],
         )
 
         remaining = headers.get("x-ratelimit-remaining-tokens")
         limit = headers.get("x-ratelimit-limit-tokens")
-        explanation = (
-            "Routed through the APIM AI Gateway: the runtime key was authenticated, "
-            "content safety and the token rate limit were evaluated, then the request "
-            f"was forwarded to {self._model}"
-        )
         if remaining and limit:
-            explanation += f". Token budget remaining this minute: {remaining} of {limit}"
-        explanation += "."
+            execution.routing_explanation += (
+                f" Token budget remaining this minute: {remaining} of {limit}."
+            )
 
         return AskResponse(
             answer=answer,
             citations=[],
-            execution=ModelExecution(
-                selected_model=payload.get("model", self._model),
-                routing_mode="gateway",
-                latency_ms=latency_ms,
-                response_id=payload.get("id", ""),
-                usage=usage,
-                tools_used=[],
-                routing_explanation=explanation,
-            ),
+            execution=execution,
         )
 
 

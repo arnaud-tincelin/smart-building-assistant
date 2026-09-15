@@ -44,9 +44,11 @@ param modelName string = 'model-router'
 param modelVersion string = '2025-11-18'
 param modelCapacity int = 30
 
-@description('Existing deployment name used by the Foundry IQ Knowledge Base.')
+@description('GPT-5-mini deployment shared by the Foundry IQ Knowledge Base and AI Gateway.')
 param knowledgeModelDeploymentName string = 'gpt-5-mini'
 param knowledgeModelName string = 'gpt-5-mini'
+param knowledgeModelVersion string = '2025-08-07'
+param knowledgeModelCapacity int = 30
 
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: accountName
@@ -69,18 +71,28 @@ resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   }
 }
 
-resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
+module modelDeployment 'model-router.bicep' = {
+  params: {
+    accountName: account.name
+    deploymentName: modelDeploymentName
+    modelName: modelName
+    modelVersion: modelVersion
+    capacity: modelCapacity
+  }
+}
+
+resource knowledgeModelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
   parent: account
-  name: modelDeploymentName
+  name: knowledgeModelDeploymentName
   sku: {
     name: 'GlobalStandard'
-    capacity: modelCapacity
+    capacity: knowledgeModelCapacity
   }
   properties: {
     model: {
       format: 'OpenAI'
-      name: modelName
-      version: modelVersion
+      name: knowledgeModelName
+      version: knowledgeModelVersion
     }
   }
 }
@@ -159,12 +171,15 @@ output projectId string = project.id
 output projectPrincipalId string = project.identity.principalId
 @description('Foundry project endpoint used by the Azure AI Projects SDK.')
 output projectEndpoint string = 'https://${account.name}.services.ai.azure.com/api/projects/${project.name}'
-output modelDeploymentName string = modelDeployment.name
-output modelDeploymentId string = modelDeployment.id
+output modelDeploymentName string = modelDeployment.outputs.deploymentName
+output modelDeploymentId string = modelDeployment.outputs.deploymentId
 output modelVersion string = modelVersion
 output modelCapacity int = modelCapacity
-output knowledgeModelDeploymentName string = knowledgeModelDeploymentName
+output knowledgeModelDeploymentName string = knowledgeModelDeployment.name
+output knowledgeModelDeploymentId string = knowledgeModelDeployment.id
 output knowledgeModelName string = knowledgeModelName
+output knowledgeModelVersion string = knowledgeModelVersion
+output knowledgeModelCapacity int = knowledgeModelCapacity
 output knowledgeModelResourceUri string = 'https://${account.name}.openai.azure.com'
 output knowledgeConnectionName string = knowledgeConnection.name
 output searchConnectionName string = searchConnection.name

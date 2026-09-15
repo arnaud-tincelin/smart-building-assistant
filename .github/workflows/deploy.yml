@@ -16,6 +16,7 @@ concurrency:
 env:
   AZURE_ENV_NAME: buildingassist-us
   NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+  BUILDINGASSIST_ENABLE_ROUTER_CONTROL: ${{ vars.BUILDINGASSIST_ENABLE_ROUTER_CONTROL || 'false' }}
 
 jobs:
   deploy:
@@ -46,6 +47,22 @@ jobs:
 
       - name: Set up Azure Developer CLI
         uses: Azure/setup-azd@v2
+
+      - name: Validate assistant UI
+        working-directory: src/frontend
+        run: |
+          npm ci
+          npm run build
+          npx playwright install --with-deps chromium
+          npm test -- --workers=2
+
+      - name: Validate backend routing and tracing
+        working-directory: src/backend
+        run: |
+          uv run --frozen --extra dev pytest \
+            tests/test_api.py tests/test_foundry_client.py tests/test_gateway_client.py \
+            tests/test_model_router.py tests/test_execution.py tests/test_agent_policy.py \
+            tests/test_telemetry.py tests/test_tracing_responses.py
 
       - name: Sign in to Azure with OIDC
         uses: azure/login@v3
