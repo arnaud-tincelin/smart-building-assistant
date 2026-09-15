@@ -1,0 +1,18 @@
+azd:
+    environmentName: buildingassist-demo
+evaluationSuites:
+    - id: buildingassist-compliance
+      tags:
+          tier: smoke
+          purpose: baseline
+      generationSource: manual-fallback
+      datasetFile: datasets/buildingassist-agent-eval-seed-v1.jsonl
+      evaluators:
+          - name: builtin.intent_resolution
+lastEval:
+    evalId: eval_5155925adfa74db6965a53cf808373eb
+    evalRunId: evalrun_649c3d0a18e149ba8344e69bdce3090d
+    runName: buildingassist-compliance
+    suiteName: buildingassist-compliance
+    agentVersion: "1"
+    startedAt: "2026-09-10T13:18:00Z"
