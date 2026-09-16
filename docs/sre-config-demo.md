@@ -94,7 +94,7 @@ Any failure after the update may leave the fault active: use the reset below.
 
 ## 2. Show the Symptom
 
-In BuildingAssist, ask `List the Contoso buildings.` in either Foundry or AI Gateway
+In BuildingAssist, ask `List the Contoso buildings.` in either Agents or AI Gateway
 mode. The UI displays `Building operations unavailable: configuration_error` and
 a `CFG-` reference. Both modes fail before spending model tokens.
 

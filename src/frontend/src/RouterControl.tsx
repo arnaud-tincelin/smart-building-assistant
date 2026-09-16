@@ -24,7 +24,7 @@ export function RouterControl({ routing, loading, busy, onChange }: {
     (menu.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')
       ?? menu.current?.querySelector<HTMLButtonElement>('[role="menuitemradio"]'))?.focus();
     function dismiss(event: PointerEvent) {
-      if (!container.current?.contains(event.target as Node)) setOpen(false);
+      if (event.target instanceof Node && !container.current?.contains(event.target)) setOpen(false);
     }
     document.addEventListener("pointerdown", dismiss);
     return () => document.removeEventListener("pointerdown", dismiss);
@@ -45,7 +45,7 @@ export function RouterControl({ routing, loading, busy, onChange }: {
       <button ref={trigger} type="button" className="router-trigger"
         aria-haspopup="menu" aria-expanded={open} aria-controls="router-menu"
         aria-label={`Router: ${loading ? "loading" : routing?.mode ?? "unavailable"}${busy ? ", updating" : ""}`}
-        onClick={() => setOpen(!open)}
+        onClick={() => setOpen((value) => !value)}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
@@ -53,7 +53,7 @@ export function RouterControl({ routing, loading, busy, onChange }: {
           }
         }}>
         {busy || loading ? <LoaderCircle size={17} className="router-spinner" aria-hidden="true" /> : <GitBranch size={17} aria-hidden="true" />}
-        Router
+        Router{routing ? `: ${routing.mode}` : ""}
         <ChevronDown size={14} aria-hidden="true" />
       </button>
       {open && (
@@ -62,7 +62,7 @@ export function RouterControl({ routing, loading, busy, onChange }: {
             if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
             event.preventDefault();
             const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'));
-            const current = options.indexOf(document.activeElement as HTMLButtonElement);
+            const current = options.findIndex((option) => option === document.activeElement);
             const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1
               : (current + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
             options[next]?.focus();

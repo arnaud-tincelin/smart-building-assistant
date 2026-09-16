@@ -13,12 +13,18 @@ from __future__ import annotations
 
 import logging
 from functools import lru_cache
+from time import perf_counter
 
+from azure.core.exceptions import AzureError
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from openai import OpenAIError, RateLimitError
 
 from .agent_policy import READ_ONLY_MCP_TOOLS
 from .config import settings
-from .models import Citation
+from .execution import describe_execution
+from .model_router import known_mode
+from .models import AskResponse, Citation, TokenUsage
+from .telemetry import record_agent_execution, trace_agent_call
 
 logger = logging.getLogger("buildingassist.foundry")
 
@@ -33,6 +39,16 @@ _MOCK_CITATIONS = [
         snippet="Weekly submeter totals for Floor 3 lighting, HVAC and plug loads.",
     )
 ]
+
+class FoundryRateLimitError(RuntimeError):
+    def __init__(self, retry_after: str | None) -> None:
+        message = "The Foundry model is busy or rate-limited."
+        if retry_after and retry_after.isdecimal():
+            message += f" Retry after {retry_after}s."
+        else:
+            message += " Please retry shortly."
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 class FoundryAgentClient:
@@ -89,11 +105,11 @@ class FoundryAgentClient:
             )
         return self._search_token_provider()
 
-    def ask(self, question: str) -> tuple[str, list[Citation]]:
-        """Ask the Foundry agent a question and return (answer, citations)."""
+    def ask(self, question: str) -> AskResponse:
+        """Invoke the single configured agent and retain its response metadata."""
         if settings.use_mock_agent:
             logger.info("Mock agent enabled — returning canned answer.")
-            return _MOCK_ANSWER, list(_MOCK_CITATIONS)
+            return AskResponse(answer=_MOCK_ANSWER, citations=list(_MOCK_CITATIONS))
 
         if not settings.project_endpoint:
             raise RuntimeError(
@@ -101,6 +117,17 @@ class FoundryAgentClient:
                 "enable BUILDINGASSIST_USE_MOCK_AGENT=true."
             )
 
+        try:
+            return self._ask(question)
+        except RateLimitError as exc:
+            retry_after = exc.response.headers.get("retry-after")
+            logger.warning("Foundry model rate-limited the request; retry-after=%s", retry_after)
+            raise FoundryRateLimitError(retry_after) from exc
+        except (AzureError, OpenAIError) as exc:
+            logger.exception("Foundry request failed")
+            raise RuntimeError("The Foundry agent request failed. Check the backend logs.") from exc
+
+    def _ask(self, question: str) -> AskResponse:
         oai = self._client()
         kwargs: dict
         if settings.agent_name:
@@ -132,32 +159,83 @@ class FoundryAgentClient:
                 }
             )
         if settings.mcp_server_url:
-            kwargs.setdefault("tools", []).append(
-                {
-                    "type": "mcp",
-                    "server_label": "building_operations",
-                    "server_description": (
-                        "Fictional current telemetry and alerts for Contoso buildings."
-                    ),
-                    "server_url": settings.mcp_server_url,
-                    "allowed_tools": READ_ONLY_MCP_TOOLS,
-                    "require_approval": "never",
-                }
-            )
+            operations_tool = {
+                "type": "mcp",
+                "server_label": "building_operations",
+                "server_description": (
+                    "Fictional current telemetry and alerts for Contoso buildings."
+                ),
+                "server_url": settings.mcp_server_url,
+                "allowed_tools": READ_ONLY_MCP_TOOLS,
+                "require_approval": "never",
+            }
+            if settings.gateway_api_key:
+                operations_tool["headers"] = {"Api-Key": settings.gateway_api_key}
+            kwargs.setdefault("tools", []).append(operations_tool)
 
         return self._create_response(oai, kwargs)
 
-    def _create_response(self, oai, kwargs: dict) -> tuple[str, list[Citation]]:
-        try:
-            response = oai.responses.create(**kwargs)
-        except Exception as exc:  # noqa: BLE001 - surface as a clean 502
-            raise RuntimeError(f"Foundry request failed: {exc}") from exc
+    def _create_response(self, oai, kwargs: dict) -> AskResponse:
+        with trace_agent_call() as (span, headers):
+            if headers:
+                kwargs = {
+                    **kwargs,
+                    "extra_headers": {**(kwargs.get("extra_headers") or {}), **headers},
+                }
+            result = self._invoke_response(oai, kwargs)
+            if result.execution is not None:
+                record_agent_execution(span, result.execution)
+            return result
+
+    def _invoke_response(self, oai, kwargs: dict) -> AskResponse:
+        routing_mode = known_mode()
+        started_at = perf_counter()
+        response = oai.responses.create(**kwargs)
+        latency_ms = round((perf_counter() - started_at) * 1000)
+        status = getattr(response, "status", None)
+        if status and status != "completed":
+            logger.error("Foundry response %s has status %s", getattr(response, "id", ""), status)
+            raise RuntimeError(f"The Foundry agent response was {status}. Please retry.")
 
         answer = (getattr(response, "output_text", None) or "").strip()
         citations = self._extract_citations(response)
         if not answer:
-            answer = "The agent did not return an answer."
-        return answer, citations
+            raise RuntimeError("The Foundry agent did not return an answer.")
+
+        raw_usage = getattr(response, "usage", None)
+        usage = None
+        if raw_usage is not None:
+            usage = TokenUsage(
+                input_tokens=getattr(raw_usage, "input_tokens", None),
+                output_tokens=getattr(raw_usage, "output_tokens", None),
+                total_tokens=getattr(raw_usage, "total_tokens", None),
+                reasoning_tokens=getattr(
+                    getattr(raw_usage, "output_tokens_details", None), "reasoning_tokens", None
+                ),
+                cached_tokens=getattr(
+                    getattr(raw_usage, "input_tokens_details", None), "cached_tokens", None
+                ),
+                cache_write_tokens=getattr(
+                    getattr(raw_usage, "input_tokens_details", None), "cache_write_tokens", None
+                ),
+            )
+        tools_used = list(dict.fromkeys(
+            item.name
+            for item in getattr(response, "output", None) or []
+            if getattr(item, "type", None) in ("mcp_call", "function_call")
+            and getattr(item, "name", None)
+        ))
+        execution = describe_execution(
+            mode="agents",
+            requested_model=settings.model_deployment,
+            reported_model=getattr(response, "model", None),
+            routing_mode=routing_mode,
+            latency_ms=latency_ms,
+            response_id=getattr(response, "id", None),
+            usage=usage,
+            tools_used=tools_used,
+        )
+        return AskResponse(answer=answer, citations=citations, execution=execution)
 
     @staticmethod
     def _extract_citations(response) -> list[Citation]:

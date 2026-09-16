@@ -14,6 +14,9 @@
     "apimPublisherEmail": {
       "value": "${APIM_PUBLISHER_EMAIL=demo@contoso-energy.example}"
     },
+    "enableRouterControl": {
+      "value": "${BUILDINGASSIST_ENABLE_ROUTER_CONTROL=false}"
+    },
     "backendImage": {
       "value": "${SERVICE_BACKEND_IMAGE_NAME=mcr.microsoft.com/azuredocs/containerapps-helloworld:latest}"
     },

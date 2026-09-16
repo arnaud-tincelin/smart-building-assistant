@@ -1,12 +1,22 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { Bot, ShieldCheck } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   ApiError,
   ask,
   checkInVisitor,
+  getRoutingMode,
   requestAccess,
+  setRoutingMode,
+  type AskMode,
   type AskResponse,
+  type RoutingMode,
+  type RoutingModeState,
   type SecurityOperationResponse,
 } from "./api";
+import { ExecutionDetails } from "./ExecutionDetails";
+import { RouterControl } from "./RouterControl";
 
 const SAMPLE_QUESTION =
   "Why is Floor 3 energy-sensitive, and what is happening there now?";
@@ -28,26 +38,92 @@ const EMPTY_OPERATION: OperationState = {
 
 export function App() {
   const [view, setView] = useState<View>("assistant");
+  const [mode, setMode] = useState<AskMode>("agents");
   const [question, setQuestion] = useState(SAMPLE_QUESTION);
   const [result, setResult] = useState<AskResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const activeRequest = useRef<AbortController | null>(null);
+  const [routing, setRouting] = useState<RoutingModeState | null>(null);
+  const [routingLoading, setRoutingLoading] = useState(true);
+  const [routingBusy, setRoutingBusy] = useState(false);
+  const [routingError, setRoutingError] = useState<string | null>(null);
+  const [routingMessage, setRoutingMessage] = useState<string | null>(null);
+  const [routingRefresh, setRoutingRefresh] = useState(0);
   const [accessMethod, setAccessMethod] = useState<AccessMethod>("badge");
   const [accessState, setAccessState] = useState<OperationState>(EMPTY_OPERATION);
   const [visitorState, setVisitorState] = useState<OperationState>(EMPTY_OPERATION);
   const credentialId = accessMethod === "badge" ? "BDG-1042" : "MOB-2048";
 
+  useEffect(() => {
+    if (mode !== "agents") return;
+    const controller = new AbortController();
+    setRoutingLoading(true);
+    setRoutingError(null);
+    getRoutingMode(controller.signal)
+      .then((state) => {
+        if (!controller.signal.aborted) setRouting(state);
+      })
+      .catch((err: unknown) => {
+        if (!controller.signal.aborted) {
+          setRouting(null);
+          setRoutingError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setRoutingLoading(false);
+      });
+    return () => controller.abort();
+  }, [mode, routingRefresh]);
+
+  useEffect(() => () => activeRequest.current?.abort(), []);
+
+  function changeMode(nextMode: AskMode) {
+    if (nextMode === mode) return;
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    setLoading(false);
+    setMode(nextMode);
+    setResult(null);
+    setError(null);
+  }
+
+  async function changeRouting(nextMode: RoutingMode) {
+    if (!routing?.editable || routingBusy || nextMode === routing.mode) return;
+    setRoutingBusy(true);
+    setRoutingMessage(null);
+    try {
+      const state = await setRoutingMode(nextMode);
+      setRouting(state);
+      const minutes = Math.ceil((state.propagation_seconds ?? 300) / 60);
+      setRoutingMessage(`Router set to ${state.mode}. Allow up to ${minutes} min to apply for all agent users.`);
+    } catch (err) {
+      setRoutingMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRoutingBusy(false);
+    }
+  }
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
     setLoading(true);
     setError(null);
     setResult(null);
     try {
-      setResult(await ask(question));
+      const answer = await ask(question, mode, controller.signal);
+      if (!controller.signal.aborted) setResult(answer);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (!controller.signal.aborted) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     } finally {
-      setLoading(false);
+      if (activeRequest.current === controller) {
+        activeRequest.current = null;
+        setLoading(false);
+      }
     }
   }
 
@@ -147,6 +223,23 @@ export function App() {
             <p className="eyebrow">Building intelligence</p>
             <h2 id="assistant-title">Ask about operations</h2>
           </div>
+          <div className="call-modes" role="group" aria-label="Answer route">
+            <button type="button" aria-pressed={mode === "agents"}
+              onClick={() => changeMode("agents")}>
+              <Bot size={18} aria-hidden="true" />
+              Agents
+            </button>
+            <button type="button" aria-pressed={mode === "gateway"}
+              onClick={() => changeMode("gateway")}>
+              <ShieldCheck size={18} aria-hidden="true" />
+              AI Gateway
+            </button>
+          </div>
+          <p className="call-mode-description">
+            {mode === "agents"
+              ? "BuildingAssist agent with Foundry IQ knowledge and building operations tools."
+              : "Direct gpt-5-mini calls through AI Gateway with read-only building tools. No agent, Model Router, or Foundry IQ."}
+          </p>
           <form onSubmit={onSubmit} className="ask-form">
             <input
               type="text"
@@ -155,17 +248,56 @@ export function App() {
               placeholder={SAMPLE_QUESTION}
               aria-label="Building question"
             />
-            <button type="submit" disabled={loading || question.trim().length === 0}>
-              {loading ? "Asking…" : "Ask"}
-            </button>
+            <div className="composer-actions">
+              {mode === "agents" ? (
+                <RouterControl routing={routing} loading={routingLoading}
+                  busy={routingBusy || loading} onChange={changeRouting} />
+              ) : (
+                <span className="fixed-model">Model: gpt-5-mini</span>
+              )}
+              <button type="submit" className="ask-submit"
+                disabled={loading || (mode === "agents" && routingBusy) || question.trim().length === 0}>
+                {loading ? "Asking…" : "Ask"}
+              </button>
+            </div>
           </form>
 
-          {error && <div className="error">{error}</div>}
+          {mode === "agents" && <p className="router-notice">
+            {routing?.editable
+              ? "Shared demo control: router changes affect all agent users and can take up to 5 min. AI Gateway stays on gpt-5-mini."
+              : "Agents use Model Router. AI Gateway uses the fixed gpt-5-mini deployment."}
+          </p>}
+          {mode === "agents" && !!routing?.model_subset?.length && (
+            <p className="router-subset">Router models: {routing.model_subset.join(" / ")}</p>
+          )}
+          {mode === "agents" && routingError && (
+            <div className="router-load-error" role="alert">
+              <span>Routing settings unavailable: {routingError}</span>
+              <button type="button" onClick={() => setRoutingRefresh((value) => value + 1)}>
+                Retry routing settings
+              </button>
+            </div>
+          )}
+          {mode === "agents" && routingMessage && (
+            <p className="router-feedback" role="status">{routingMessage}</p>
+          )}
+          {error && <div className="error" role="alert">{error}</div>}
 
           {result && (
             <section className="answer">
               <h2>Answer</h2>
-              <p>{result.answer}</p>
+              <div className="answer-body">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                  table: ({ children }) => (
+                    <div className="answer-table" role="region" aria-label="Answer table" tabIndex={0}>
+                      <table>{children}</table>
+                    </div>
+                  ),
+                }}>
+                  {result.answer}
+                </ReactMarkdown>
+              </div>
+              <ExecutionDetails execution={result.execution} />
 
               {result.citations.length > 0 && (
                 <div className="citations">
