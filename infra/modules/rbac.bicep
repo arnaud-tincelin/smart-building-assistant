@@ -34,10 +34,12 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
 
 // Router control: the app reads and updates the routing mode of the single demo
 // model deployment. The built-in Cognitive Services Contributor role is assigned
-// on that deployment only — it grants no access to the parent account, so account
-// keys stay out of reach. A custom role definition is deliberately avoided here:
-// creating one requires Microsoft.Authorization/roleDefinitions/write, which the
-// deployment identity does not have.
+// on that deployment only. It is broader than the read/write the app uses (it
+// covers Microsoft.CognitiveServices/* on that one deployment, including delete),
+// but it grants nothing on the parent account, so account keys stay out of reach.
+// A custom role definition is deliberately avoided here: creating one requires
+// Microsoft.Authorization/roleDefinitions/write, which the deployment identity
+// does not have.
 var cognitiveServicesContributorRoleId = '25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68'
 
 resource routerControlAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableRouterControl) {
