@@ -118,9 +118,15 @@ header h1 {
 }
 
 .ask-form {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem 0;
+  background: var(--bg);
 }
 
 .ask-form input {
@@ -331,6 +337,8 @@ header h1 {
 
 button:focus-visible,
 summary:focus-visible,
+.chat-history:focus-visible,
+.answer-body pre:focus-visible,
 .answer-table:focus-visible,
 .ask-form input:focus-visible {
   outline: 2px solid #74c0fc;
@@ -345,11 +353,44 @@ summary:focus-visible,
   color: #ffc9c9;
 }
 
-.answer {
-  margin-top: 2rem;
+.chat-history {
+  min-height: 8rem;
+  max-height: clamp(12rem, 40dvh, 28rem);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  overflow-anchor: none;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+.chat-empty {
+  color: var(--muted);
+}
+
+.answer,
+.user-message {
+  min-width: 0;
+  margin: 0.75rem 0;
   padding: 1.5rem;
   border-radius: 8px;
   background: var(--panel);
+}
+
+.user-message {
+  margin-left: 1.5rem;
+  border-left: 3px solid var(--accent);
+  background: var(--panel-raised);
+}
+
+.user-message p {
+  white-space: pre-wrap;
+}
+
+.answer > h3,
+.user-message > h3 {
+  margin-top: 0;
 }
 
 .answer h2 {
@@ -362,7 +403,12 @@ summary:focus-visible,
 }
 
 .answer-body pre {
+  max-width: 100%;
   overflow-x: auto;
+}
+
+.answer-body img {
+  max-width: 100%;
 }
 
 .answer-table {

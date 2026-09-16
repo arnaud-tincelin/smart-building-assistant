@@ -17,10 +17,11 @@ for (const mode of ["Agents", "AI Gateway"]) {
     const question = page.getByRole("textbox", { name: "Building question" });
     await question.fill("List the Contoso buildings.");
     await page.getByRole("button", { name: "Ask", exact: true }).click();
-    await expect(page.getByText(
+    const history = page.getByRole("log", { name: "Conversation history" });
+    await expect(history.getByRole("alert")).toContainText(
       "Building operations unavailable: configuration_error. Reference: CFG-TEST",
-      { exact: true },
-    )).toBeVisible();
+    );
+    await expect(history.getByRole("article", { name: "Assistant reply", exact: true })).toHaveCount(0);
     await expect(question).toHaveValue("List the Contoso buildings.");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
       .toBeTruthy();
@@ -28,7 +29,9 @@ for (const mode of ["Agents", "AI Gateway"]) {
     broken = false;
     await page.getByRole("button", { name: "Ask", exact: true }).click();
     await expect(page.getByText("Building operations recovered.", { exact: true })).toBeVisible();
-    await expect(page.getByText(/Reference: CFG-TEST/)).toHaveCount(0);
+    await expect(history.getByRole("alert")).toContainText("Reference: CFG-TEST");
+    await expect(history.getByRole("article", { name: "Assistant reply", exact: true })).toHaveCount(1);
+    await expect(history.getByRole("article", { name: "User message", exact: true })).toHaveCount(2);
   });
 
   test(`${mode} shows throttling clearly and keeps retry available`, async ({ page }) => {
@@ -48,6 +51,6 @@ for (const mode of ["Agents", "AI Gateway"]) {
     await expect(page.getByRole("alert")).toContainText("rate-limited. Retry after 21s.");
     await expect(page.getByRole("button", { name: "Ask", exact: true })).toBeEnabled();
     await expect(question).toHaveValue("List the Contoso buildings.");
-    await expect(page.locator(".answer")).toHaveCount(0);
+    await expect(page.getByRole("article", { name: "Assistant reply", exact: true })).toHaveCount(0);
   });
 }

@@ -52,8 +52,24 @@ BuildingAssist agent, so there is no agent selector:
 - **AI Gateway** calls **gpt-5-mini** directly through the gateway. The backend runs a
   bounded, read-only building-tool loop; this path does not invoke Foundry Agent
   Service, use Model Router or Foundry IQ, or perform building actions.
-- Switching modes preserves the question, clears the previous result, and ignores
-  answers from requests started in the previous mode.
+- Each mode has its own chronological chat history for the current page session.
+  Switching modes preserves the question and both histories; leaving and returning
+  to the Assistant tab also preserves them. Reloading the page clears all history.
+  Nothing is saved to browser storage or synchronized across sessions.
+- History is display-only: `/ask` still sends just the current question and mode,
+  not prior turns. Include necessary building/context details in each question.
+- Switching modes cancels an in-flight request, leaves an explicit cancellation
+  notice in its original conversation, and ignores any late response. Pending
+  requests and failures do not erase completed exchanges; failures remain visible
+  and another question can be submitted.
+- The keyboard-focusable transcript scrolls independently of the composer.
+  New replies follow the bottom only when you are already near it; reviewing
+  older messages preserves your scroll position. Each mode retains its scroll
+  position across mode and tab switches.
+- Every reply renders GitHub-flavored Markdown, including tables and code, and
+  retains its own sources and execution details. Wide tables and fenced code
+  scroll within the reply rather than widening the page. Generated HTML is not
+  executed, and unsafe Markdown/source link protocols are filtered.
 - Each answer shows the model disclosed by the final response and the shared
   router configuration at request start (or **Fixed model** for AI Gateway).
   **Show more details** expands latency,
@@ -123,6 +139,13 @@ cd src/frontend
 npx playwright install chromium
 npm test
 ```
+
+The mocked Playwright suite runs at desktop (1440 × 900) and mobile (390 × 844)
+sizes without Azure services. `npm test -- tests/conversation-history.spec.ts`
+targets chat ordering, model/source ownership, Markdown safety, actual scrolling,
+history lifetime, and delayed/failed requests. Request-mode tests also cover
+cancellation and separate histories. Run `npm run build` for the frontend
+TypeScript check and production build.
 
 Offline mock mode applies to the agent path only. Gateway mode requires the
 backend settings in [`.env.example`](src/backend/.env.example) and does not fall

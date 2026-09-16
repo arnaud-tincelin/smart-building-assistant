@@ -1,6 +1,6 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Bot, ShieldCheck } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   ApiError,
@@ -24,6 +24,18 @@ const SAMPLE_QUESTION =
 type View = "assistant" | "security";
 type AccessMethod = "badge" | "mobile";
 
+type TurnOutcome =
+  | { status: "pending" }
+  | { status: "completed"; response: AskResponse }
+  | { status: "failed"; error: string }
+  | { status: "cancelled" };
+
+interface ChatTurn {
+  id: number;
+  question: string;
+  outcome: TurnOutcome;
+}
+
 interface OperationState {
   loading: boolean;
   error: ApiError | null;
@@ -40,10 +52,18 @@ export function App() {
   const [view, setView] = useState<View>("assistant");
   const [mode, setMode] = useState<AskMode>("agents");
   const [question, setQuestion] = useState(SAMPLE_QUESTION);
-  const [result, setResult] = useState<AskResponse | null>(null);
+  const [histories, setHistories] = useState<Record<AskMode, ChatTurn[]>>({
+    agents: [],
+    gateway: [],
+  });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
+  const nextTurnId = useRef(0);
+  const transcript = useRef<HTMLDivElement | null>(null);
+  const scrollPositions = useRef({
+    agents: { top: 0, following: true },
+    gateway: { top: 0, following: true },
+  });
   const [routing, setRouting] = useState<RoutingModeState | null>(null);
   const [routingLoading, setRoutingLoading] = useState(true);
   const [routingBusy, setRoutingBusy] = useState(false);
@@ -54,6 +74,14 @@ export function App() {
   const [accessState, setAccessState] = useState<OperationState>(EMPTY_OPERATION);
   const [visitorState, setVisitorState] = useState<OperationState>(EMPTY_OPERATION);
   const credentialId = accessMethod === "badge" ? "BDG-1042" : "MOB-2048";
+  const turns = histories[mode];
+
+  useLayoutEffect(() => {
+    const region = transcript.current;
+    if (!region) return;
+    const position = scrollPositions.current[mode];
+    region.scrollTop = position.following ? region.scrollHeight : position.top;
+  }, [turns, mode, view]);
 
   useEffect(() => {
     if (mode !== "agents") return;
@@ -82,10 +110,14 @@ export function App() {
     if (nextMode === mode) return;
     activeRequest.current?.abort();
     activeRequest.current = null;
+    setHistories((previous) => ({
+      ...previous,
+      [mode]: previous[mode].map((turn) => turn.outcome.status === "pending"
+        ? { ...turn, outcome: { status: "cancelled" } }
+        : turn),
+    }));
     setLoading(false);
     setMode(nextMode);
-    setResult(null);
-    setError(null);
   }
 
   async function changeRouting(nextMode: RoutingMode) {
@@ -106,19 +138,28 @@ export function App() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    activeRequest.current?.abort();
+    if (activeRequest.current || !question.trim() || (mode === "agents" && routingBusy)) return;
     const controller = new AbortController();
+    const id = nextTurnId.current++;
+    const submittedQuestion = question;
     activeRequest.current = controller;
     setLoading(true);
-    setError(null);
-    setResult(null);
+    setHistories((previous) => ({
+      ...previous,
+      [mode]: [...previous[mode], { id, question: submittedQuestion, outcome: { status: "pending" } }],
+    }));
+    function finish(outcome: TurnOutcome) {
+      if (controller.signal.aborted || activeRequest.current !== controller) return;
+      setHistories((previous) => ({
+        ...previous,
+        [mode]: previous[mode].map((turn) => turn.id === id ? { ...turn, outcome } : turn),
+      }));
+    }
     try {
-      const answer = await ask(question, mode, controller.signal);
-      if (!controller.signal.aborted) setResult(answer);
+      const response = await ask(submittedQuestion, mode, controller.signal);
+      finish({ status: "completed", response });
     } catch (err) {
-      if (!controller.signal.aborted) {
-        setError(err instanceof Error ? err.message : String(err));
-      }
+      finish({ status: "failed", error: err instanceof Error ? err.message : String(err) });
     } finally {
       if (activeRequest.current === controller) {
         activeRequest.current = null;
@@ -240,6 +281,72 @@ export function App() {
               ? "BuildingAssist agent with Foundry IQ knowledge and building operations tools."
               : "Direct gpt-5-mini calls through AI Gateway with read-only building tools. No agent, Model Router, or Foundry IQ."}
           </p>
+          <div className="chat-history" role="log" aria-label="Conversation history"
+            tabIndex={0} ref={transcript}
+            onScroll={(event) => {
+              const region = event.currentTarget;
+              scrollPositions.current[mode] = {
+                top: region.scrollTop,
+                following: region.scrollHeight - region.clientHeight - region.scrollTop <= 48,
+              };
+            }}>
+            {turns.length === 0 && <p className="chat-empty">Ask a question to start this conversation.</p>}
+            {turns.map((turn) => (
+              <Fragment key={turn.id}>
+                <article className="user-message" aria-label="User message">
+                  <h3>You</h3>
+                  <p>{turn.question}</p>
+                </article>
+                {turn.outcome.status === "pending" && <p role="status">Asking…</p>}
+                {turn.outcome.status === "failed" && (
+                  <div className="error" role="alert">Request failed: {turn.outcome.error}</div>
+                )}
+                {turn.outcome.status === "cancelled" && (
+                  <p role="status">Request cancelled after switching modes.</p>
+                )}
+                {turn.outcome.status === "completed" && (
+                  <article className="answer" aria-label="Assistant reply">
+                    <h3>Assistant</h3>
+                    <div className="answer-body">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                        pre: ({ children }) => <pre tabIndex={0}>{children}</pre>,
+                        table: ({ children }) => (
+                          <div className="answer-table" role="region" aria-label="Answer table" tabIndex={0}>
+                            <table>{children}</table>
+                          </div>
+                        ),
+                      }}>
+                        {turn.outcome.response.answer}
+                      </ReactMarkdown>
+                    </div>
+                    <ExecutionDetails execution={turn.outcome.response.execution} />
+                    {turn.outcome.response.citations.length > 0 && (
+                      <div className="citations">
+                        <h3>Sources</h3>
+                        <ul>
+                          {turn.outcome.response.citations.map((citation, index) => {
+                            const url = defaultUrlTransform(citation.url);
+                            return (
+                              <li key={index}>
+                                {url ? (
+                                  <a href={url} target="_blank" rel="noreferrer">
+                                    {citation.title || citation.url}
+                                  </a>
+                                ) : (
+                                  <span>{citation.title || citation.url}</span>
+                                )}
+                                {citation.snippet && <p className="snippet">{citation.snippet}</p>}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                  </article>
+                )}
+              </Fragment>
+            ))}
+          </div>
           <form onSubmit={onSubmit} className="ask-form">
             <input
               type="text"
@@ -280,45 +387,6 @@ export function App() {
           )}
           {mode === "agents" && routingMessage && (
             <p className="router-feedback" role="status">{routingMessage}</p>
-          )}
-          {error && <div className="error" role="alert">{error}</div>}
-
-          {result && (
-            <section className="answer">
-              <h2>Answer</h2>
-              <div className="answer-body">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-                  table: ({ children }) => (
-                    <div className="answer-table" role="region" aria-label="Answer table" tabIndex={0}>
-                      <table>{children}</table>
-                    </div>
-                  ),
-                }}>
-                  {result.answer}
-                </ReactMarkdown>
-              </div>
-              <ExecutionDetails execution={result.execution} />
-
-              {result.citations.length > 0 && (
-                <div className="citations">
-                  <h3>Sources</h3>
-                  <ul>
-                    {result.citations.map((citation, index) => (
-                      <li key={index}>
-                        {citation.url ? (
-                          <a href={citation.url} target="_blank" rel="noreferrer">
-                            {citation.title || citation.url}
-                          </a>
-                        ) : (
-                          <span>{citation.title}</span>
-                        )}
-                        {citation.snippet && <p className="snippet">{citation.snippet}</p>}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </section>
           )}
         </section>
       ) : (
