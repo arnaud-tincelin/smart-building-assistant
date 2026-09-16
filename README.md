@@ -172,16 +172,16 @@ and smoke-tests both application URLs.
 
 The identity has **Contributor** and **Role Based Access Control Administrator** at
 subscription scope because the application template creates a resource group and
-its role assignments. It also gets a dedicated **BuildingAssist role definition
-writer** custom role, because Role Based Access Control Administrator can assign
-roles but cannot create or delete the custom role definitions the template
-provisions (router control, SRE config repair). Keep this demo subscription
-dedicated to the environment.
+its role assignments. Keep this demo subscription dedicated to the environment.
+The helper preserves existing tags on the CI identity and its resource group
+when reconfiguring them.
 
 The workflow builds and browser-tests the assistant UI and runs backend API,
 model-routing, and tracing regression tests before deployment. Its
 non-secret repository variable `BUILDINGASSIST_ENABLE_ROUTER_CONTROL` controls the
 same demo opt-in as the local azd setting and defaults to `false`.
+When enabled, deployment assigns the existing **BuildingAssist Model Router
+control** role; it does not create or update custom role definitions.
 
 ### AI Gateway tier (preview)
 

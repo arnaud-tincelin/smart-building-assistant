@@ -60,6 +60,23 @@ if [[ ! -f "$template_file" ]]; then
   exit 1
 fi
 
+identity_resource_group_tags='{}'
+identity_tags='{}'
+identity_resource_group_exists="$(az group exists \
+  --subscription "$subscription_id" \
+  --name "$identity_resource_group" \
+  --output tsv)"
+if [[ "$identity_resource_group_exists" == true ]]; then
+  identity_resource_group_tags="$(az group show \
+    --subscription "$subscription_id" \
+    --name "$identity_resource_group" \
+    --query 'tags || `{}`' --output json)"
+  identity_tags="$(az identity list \
+    --subscription "$subscription_id" \
+    --resource-group "$identity_resource_group" \
+    --query "[?name=='$identity_name'].tags | [0] || \`{}\`" --output json)"
+fi
+
 echo "Repository   : $repository"
 echo "Branch       : $branch"
 echo "Subscription : $subscription_id"
@@ -75,6 +92,8 @@ deployment_parameters=(
   "githubBranch=$branch"
   "identityResourceGroupName=$identity_resource_group"
   "identityName=$identity_name"
+  "identityResourceGroupTags=$identity_resource_group_tags"
+  "identityTags=$identity_tags"
 )
 
 echo "Previewing Azure identity and RBAC changes..."

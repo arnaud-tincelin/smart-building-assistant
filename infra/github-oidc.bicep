@@ -30,6 +30,12 @@ param identityResourceGroupName string = 'rg-buildingassist-cicd'
 @description('Name of the user-assigned managed identity used by GitHub Actions.')
 param identityName string = 'id-buildingassist-github'
 
+@description('Existing tags on the CI/CD identity resource group to retain during reconfiguration.')
+param identityResourceGroupTags object = {}
+
+@description('Existing tags on the CI/CD identity to retain during reconfiguration.')
+param identityTags object = {}
+
 var tags = {
   project: 'buildingassist'
   purpose: 'github-cicd'
@@ -49,7 +55,7 @@ var deploymentIdentityId = resourceId(
 resource identityResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: identityResourceGroupName
   location: location
-  tags: tags
+  tags: union(identityResourceGroupTags, tags)
 }
 
 module deploymentIdentity 'modules/github-oidc-identity.bicep' = {
@@ -59,7 +65,7 @@ module deploymentIdentity 'modules/github-oidc-identity.bicep' = {
     githubSubject: '${resolvedGithubSubjectPrefix}:ref:refs/heads/${githubBranch}'
     identityName: identityName
     location: location
-    tags: tags
+    tags: union(identityTags, tags)
   }
 }
 
@@ -80,43 +86,6 @@ resource rbacAdministratorAssignment 'Microsoft.Authorization/roleAssignments@20
     principalId: deploymentIdentity.outputs.principalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', rbacAdministratorRoleId)
-  }
-}
-
-// Role Based Access Control Administrator can assign roles but cannot write role
-// definitions. The application template creates its own narrowly scoped custom
-// roles (router control, SRE config repair), so the CI/CD identity also needs
-// this dedicated permission — not covered by any single built-in role short of
-// Owner.
-resource roleDefinitionWriterRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
-  name: guid(subscription().id, 'buildingassist-role-definition-writer')
-  properties: {
-    roleName: 'BuildingAssist role definition writer'
-    description: 'Create and delete the custom role definitions used by the BuildingAssist application template.'
-    type: 'CustomRole'
-    assignableScopes: [
-      subscription().id
-    ]
-    permissions: [
-      {
-        actions: [
-          'Microsoft.Authorization/roleDefinitions/write'
-          'Microsoft.Authorization/roleDefinitions/delete'
-        ]
-        notActions: []
-        dataActions: []
-        notDataActions: []
-      }
-    ]
-  }
-}
-
-resource roleDefinitionWriterAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(subscription().id, deploymentIdentityId, 'buildingassist-role-definition-writer')
-  properties: {
-    principalId: deploymentIdentity.outputs.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: roleDefinitionWriterRole.id
   }
 }
 

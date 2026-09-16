@@ -32,34 +32,16 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
   name: modelDeploymentName
 }
 
-resource routerControlRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = if (enableRouterControl) {
-  name: guid(resourceGroup().id, 'buildingassist-model-router-control')
-  properties: {
-    roleName: 'BuildingAssist Model Router control (${resourceGroup().name})'
-    description: 'Read and update the single demo model deployment. No delete or key access.'
-    type: 'CustomRole'
-    assignableScopes: [
-      resourceGroup().id
-    ]
-    permissions: [
-      {
-        actions: [
-          'Microsoft.CognitiveServices/accounts/deployments/read'
-          'Microsoft.CognitiveServices/accounts/deployments/write'
-        ]
-        notActions: []
-        dataActions: []
-        notDataActions: []
-      }
-    ]
-  }
-}
+var routerControlRoleId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  guid(resourceGroup().id, 'buildingassist-model-router-control')
+)
 
 resource routerControlAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableRouterControl) {
   name: guid(modelDeployment.id, appPrincipalId, 'buildingassist-model-router-control')
   scope: modelDeployment
   properties: {
-    roleDefinitionId: routerControlRole!.id
+    roleDefinitionId: routerControlRoleId
     principalId: appPrincipalId
     principalType: 'ServicePrincipal'
   }
