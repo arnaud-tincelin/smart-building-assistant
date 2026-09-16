@@ -8,9 +8,29 @@ export interface Citation {
   snippet: string;
 }
 
+export interface UsageInfo {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  reasoning_tokens: number;
+  cached_tokens: number;
+  cache_write_tokens: number;
+}
+
+export interface ExecutionInfo {
+  selected_model?: string | null;
+  routing_mode?: string | null;
+  latency_ms?: number | null;
+  response_id?: string | null;
+  routing_explanation?: string | null;
+  tools_used?: string[];
+  usage?: UsageInfo | null;
+}
+
 export interface AskResponse {
   answer: string;
   citations: Citation[];
+  execution?: ExecutionInfo | null;
 }
 
 export interface AccessRequest {
@@ -56,11 +76,11 @@ export class ApiError extends Error {
   }
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function request<T>(path: string, method: string, body?: unknown): Promise<T> {
   const response = await fetch(endpoint(path), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    method,
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -85,18 +105,30 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function ask(question: string): Promise<AskResponse> {
-  return post<AskResponse>("/ask", { question });
+function post<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, "POST", body);
+}
+
+export async function ask(question: string, scenario: string | null): Promise<AskResponse> {
+  return post<AskResponse>("/ask", { question, scenario });
 }
 
 export async function requestAccess(
-  request: AccessRequest,
+  accessRequest: AccessRequest,
 ): Promise<SecurityOperationResponse> {
-  return post<SecurityOperationResponse>("/security/access-requests", request);
+  return post<SecurityOperationResponse>("/security/access-requests", accessRequest);
 }
 
 export async function checkInVisitor(
-  request: VisitorCheckInRequest,
+  visitorRequest: VisitorCheckInRequest,
 ): Promise<SecurityOperationResponse> {
-  return post<SecurityOperationResponse>("/security/visitors/check-in", request);
+  return post<SecurityOperationResponse>("/security/visitors/check-in", visitorRequest);
+}
+
+export async function getRoutingMode(): Promise<RoutingModeState> {
+  return request<RoutingModeState>("/model-router/mode", "GET");
+}
+
+export async function setRoutingMode(mode: RoutingMode): Promise<RoutingModeState> {
+  return request<RoutingModeState>("/model-router/mode", "PUT", { mode });
 }

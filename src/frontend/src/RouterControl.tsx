@@ -8,10 +8,11 @@ const MODES: { id: RoutingMode; label: string; description: string }[] = [
   { id: "quality", label: "Quality", description: "Highest-rated model, cost ignored" },
 ];
 
-export function RouterControl({ routing, loading, busy, onChange }: {
+export function RouterControl({ routing, loading, busy, message, onChange }: {
   routing: RoutingModeState | null;
   loading: boolean;
   busy: boolean;
+  message?: string | null;
   onChange: (mode: RoutingMode) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -82,14 +83,14 @@ export function RouterControl({ routing, loading, busy, onChange }: {
               <span id={`router-tip-${option.id}`} role="tooltip" className="router-tooltip">{option.description}</span>
             </button>
           ))}
-          {(loading || !routing || !routing.editable) && (
-            <p className="router-readonly" role="status">
-              {loading ? "Loading routing settings..." : !routing
-                ? "Routing settings unavailable. Check the backend connection and reload."
-                : "Routing is read-only in this environment."}
-            </p>
-          )}
         </div>
+      )}
+      {(message || loading || !routing || !routing.editable) && (
+        <p className="router-readonly" role="status">
+          {message ? message : loading ? "Loading routing settings..." : !routing
+            ? "Routing settings unavailable. Check the backend connection and reload."
+            : "Routing is read-only in this environment."}
+        </p>
       )}
     </div>
   );

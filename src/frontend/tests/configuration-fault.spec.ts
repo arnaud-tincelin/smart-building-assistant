@@ -28,6 +28,11 @@ for (const mode of ["Foundry", "AI Gateway"]) {
     broken = false;
     await page.getByRole("button", { name: "Ask", exact: true }).click();
     await expect(page.getByText("Building operations recovered.", { exact: true })).toBeVisible();
-    await expect(page.getByText(/Reference: CFG-TEST/)).toHaveCount(0);
+    // The failed exchange remains in the transcript (AC7): retrying does not
+    // erase or relabel history, it only appends a new, successful turn.
+    await expect(page.getByText(
+      "Building operations unavailable: configuration_error. Reference: CFG-TEST",
+      { exact: true },
+    )).toBeVisible();
   });
 }

@@ -1,18 +1,29 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   ApiError,
   ask,
   checkInVisitor,
+  getRoutingMode,
   requestAccess,
-  type AskResponse,
+  setRoutingMode,
+  type Citation,
+  type ExecutionInfo,
+  type RoutingMode,
+  type RoutingModeState,
   type SecurityOperationResponse,
 } from "./api";
+import { ExecutionDetails } from "./ExecutionDetails";
+import { RouterControl } from "./RouterControl";
 
 const SAMPLE_QUESTION =
   "Why is Floor 3 energy-sensitive, and what is happening there now?";
 
 type View = "assistant" | "security";
 type AccessMethod = "badge" | "mobile";
+type CallMode = "foundry" | "gateway";
+type ScenarioKey = "general" | "quick" | "live" | "compliance";
 
 interface OperationState {
   loading: boolean;
@@ -26,26 +37,138 @@ const EMPTY_OPERATION: OperationState = {
   result: null,
 };
 
+const SCENARIOS: { key: ScenarioKey; label: string; scenario: string | null }[] = [
+  { key: "general", label: "General", scenario: null },
+  { key: "quick", label: "Quick lookup", scenario: "quick" },
+  { key: "live", label: "Live operations", scenario: "live" },
+  { key: "compliance", label: "Compliance analysis", scenario: "compliance" },
+];
+
+// A single turn in the Assistant conversation transcript. User turns are
+// captured immediately; agent turns start "pending" and are updated in place
+// once the response (or error) for that specific turn arrives, so a later or
+// stale response can never be attributed to the wrong message.
+interface ChatMessage {
+  id: number;
+  role: "user" | "agent";
+  status: "done" | "pending" | "error";
+  text?: string;
+  citations?: Citation[];
+  execution?: ExecutionInfo | null;
+  errorMessage?: string;
+}
+
+function formatPropagationMessage(seconds?: number): string {
+  if (!seconds || seconds <= 0) {
+    return "Routing mode updated.";
+  }
+  const duration = seconds >= 60 ? `${Math.round(seconds / 60)} min` : `${seconds} s`;
+  return `Routing mode updated. Allow up to ${duration} to propagate.`;
+}
+
 export function App() {
   const [view, setView] = useState<View>("assistant");
   const [question, setQuestion] = useState(SAMPLE_QUESTION);
-  const [result, setResult] = useState<AskResponse | null>(null);
+  const [callMode, setCallMode] = useState<CallMode>("foundry");
+  const [scenario, setScenario] = useState<ScenarioKey>("live");
+  const [conversations, setConversations] = useState<Record<CallMode, ChatMessage[]>>({
+    foundry: [],
+    gateway: [],
+  });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [routing, setRouting] = useState<RoutingModeState | null>(null);
+  const [routingLoading, setRoutingLoading] = useState(true);
+  const [routingBusy, setRoutingBusy] = useState(false);
+  const [routingMessage, setRoutingMessage] = useState<string | null>(null);
   const [accessMethod, setAccessMethod] = useState<AccessMethod>("badge");
   const [accessState, setAccessState] = useState<OperationState>(EMPTY_OPERATION);
   const [visitorState, setVisitorState] = useState<OperationState>(EMPTY_OPERATION);
   const credentialId = accessMethod === "badge" ? "BDG-1042" : "MOB-2048";
+  const nextMessageId = useRef(0);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const messages = conversations[callMode];
+
+  useEffect(() => {
+    let cancelled = false;
+    setRoutingLoading(true);
+    getRoutingMode()
+      .then((state) => {
+        if (!cancelled) setRouting(state);
+      })
+      .catch(() => {
+        if (!cancelled) setRouting(null);
+      })
+      .finally(() => {
+        if (!cancelled) setRoutingLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const node = transcriptRef.current;
+    if (node) node.scrollTop = node.scrollHeight;
+  }, [messages]);
+
+  async function onRoutingChange(mode: RoutingMode) {
+    setRoutingBusy(true);
+    setRoutingMessage(null);
+    try {
+      const updated = await setRoutingMode(mode);
+      setRouting(updated);
+      setRoutingMessage(formatPropagationMessage(updated.propagation_seconds));
+    } catch (err) {
+      setRoutingMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRoutingBusy(false);
+    }
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    const trimmed = question.trim();
+    if (!trimmed || loading) return;
+
+    const mode = callMode;
+    const scenarioValue =
+      mode === "gateway" ? "governed" : SCENARIOS.find((option) => option.key === scenario)?.scenario ?? null;
+    const userMessageId = nextMessageId.current++;
+    const agentMessageId = nextMessageId.current++;
+
+    setConversations((prev) => ({
+      ...prev,
+      [mode]: [
+        ...prev[mode],
+        { id: userMessageId, role: "user", status: "done", text: trimmed },
+        { id: agentMessageId, role: "agent", status: "pending" },
+      ],
+    }));
     setLoading(true);
-    setError(null);
-    setResult(null);
     try {
-      setResult(await ask(question));
+      const response = await ask(trimmed, scenarioValue);
+      setConversations((prev) => ({
+        ...prev,
+        [mode]: prev[mode].map((message) =>
+          message.id === agentMessageId
+            ? {
+                ...message,
+                status: "done",
+                text: response.answer,
+                citations: response.citations,
+                execution: response.execution ?? null,
+              }
+            : message,
+        ),
+      }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setConversations((prev) => ({
+        ...prev,
+        [mode]: prev[mode].map((message) =>
+          message.id === agentMessageId ? { ...message, status: "error", errorMessage } : message,
+        ),
+      }));
     } finally {
       setLoading(false);
     }
@@ -147,47 +270,132 @@ export function App() {
             <p className="eyebrow">Building intelligence</p>
             <h2 id="assistant-title">Ask about operations</h2>
           </div>
-          <form onSubmit={onSubmit} className="ask-form">
-            <input
-              type="text"
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-              placeholder={SAMPLE_QUESTION}
-              aria-label="Building question"
-            />
-            <button type="submit" disabled={loading || question.trim().length === 0}>
-              {loading ? "Asking…" : "Ask"}
-            </button>
-          </form>
 
-          {error && <div className="error">{error}</div>}
-
-          {result && (
-            <section className="answer">
-              <h2>Answer</h2>
-              <p>{result.answer}</p>
-
-              {result.citations.length > 0 && (
-                <div className="citations">
-                  <h3>Sources</h3>
-                  <ul>
-                    {result.citations.map((citation, index) => (
-                      <li key={index}>
-                        {citation.url ? (
-                          <a href={citation.url} target="_blank" rel="noreferrer">
-                            {citation.title || citation.url}
-                          </a>
-                        ) : (
-                          <span>{citation.title}</span>
-                        )}
-                        {citation.snippet && <p className="snippet">{citation.snippet}</p>}
-                      </li>
+          <div className="composer">
+            <div className="mode-bar">
+              <div className="segmented-control mode-toggle">
+                <button
+                  type="button"
+                  className={callMode === "foundry" ? "active" : ""}
+                  aria-pressed={callMode === "foundry"}
+                  onClick={() => setCallMode("foundry")}
+                >
+                  Foundry
+                </button>
+                <button
+                  type="button"
+                  className={callMode === "gateway" ? "active" : ""}
+                  aria-pressed={callMode === "gateway"}
+                  onClick={() => setCallMode("gateway")}
+                >
+                  AI Gateway
+                </button>
+              </div>
+              {callMode === "foundry" && (
+                <label className="agent-picker">
+                  Agent
+                  <select
+                    value={scenario}
+                    onChange={(event) => setScenario(event.target.value as ScenarioKey)}
+                  >
+                    {SCENARIOS.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {option.label}
+                      </option>
                     ))}
-                  </ul>
-                </div>
+                  </select>
+                </label>
               )}
-            </section>
-          )}
+            </div>
+
+            <form onSubmit={onSubmit} className="ask-form">
+              <input
+                type="text"
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                placeholder={SAMPLE_QUESTION}
+                aria-label="Building question"
+              />
+              <RouterControl
+                routing={routing}
+                loading={routingLoading}
+                busy={routingBusy}
+                message={routingMessage}
+                onChange={onRoutingChange}
+              />
+              <button type="submit" disabled={loading || question.trim().length === 0}>
+                {loading ? "Asking…" : "Ask"}
+              </button>
+            </form>
+          </div>
+
+          <div
+            className="chat-transcript"
+            role="log"
+            aria-label="Conversation history"
+            aria-live="polite"
+            tabIndex={0}
+            ref={transcriptRef}
+          >
+            {messages.length === 0 && (
+              <p className="chat-empty">Ask a question to start the conversation.</p>
+            )}
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`chat-message chat-message--${message.role}`}
+                data-status={message.status}
+              >
+                <span className="chat-message__speaker">
+                  {message.role === "user" ? "You" : "Assistant"}
+                </span>
+                <div className="chat-message__body">
+                  {message.role === "user" && <p>{message.text}</p>}
+                  {message.role === "agent" && message.status === "pending" && (
+                    <p className="chat-message__pending" role="status">
+                      Asking the building agent…
+                    </p>
+                  )}
+                  {message.role === "agent" && message.status === "error" && (
+                    <p className="chat-message__error" role="alert">
+                      {message.errorMessage}
+                    </p>
+                  )}
+                  {message.role === "agent" && message.status === "done" && (
+                    <>
+                      <div className="markdown-body">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {message.text ?? ""}
+                        </ReactMarkdown>
+                      </div>
+
+                      {message.citations && message.citations.length > 0 && (
+                        <div className="citations">
+                          <h3>Sources</h3>
+                          <ul>
+                            {message.citations.map((citation, index) => (
+                              <li key={index}>
+                                {citation.url ? (
+                                  <a href={citation.url} target="_blank" rel="noreferrer">
+                                    {citation.title || citation.url}
+                                  </a>
+                                ) : (
+                                  <span>{citation.title}</span>
+                                )}
+                                {citation.snippet && <p className="snippet">{citation.snippet}</p>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      <ExecutionDetails execution={message.execution} />
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
       ) : (
         <section className="view-panel" aria-labelledby="security-title">
