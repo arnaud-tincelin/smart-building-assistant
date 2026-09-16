@@ -138,6 +138,10 @@ module apim 'modules/apim.bicep' = {
     modelDeploymentName: foundry.outputs.knowledgeModelDeploymentName
     modelName: foundry.outputs.knowledgeModelName
     modelVersion: foundry.outputs.knowledgeModelVersion
+    routerModelDeploymentId: foundry.outputs.modelDeploymentId
+    routerModelDeploymentName: foundry.outputs.modelDeploymentName
+    routerModelName: foundry.outputs.modelName
+    routerModelVersion: foundry.outputs.modelVersion
     tokenLimitPerMinute: foundry.outputs.knowledgeModelCapacity * 1000
     backendUrl: backendUrl
   }
@@ -335,6 +339,7 @@ output AI_GATEWAY_CONNECTOR_NAMESPACE_RESOURCE_ID string = apim.outputs.connecto
 output AI_GATEWAY_TELEMETRY_EXPORTER_RESOURCE_ID string = '${apim.outputs.apimId}/workspaces/default/telemetryExporters/appinsights'
 output BUILDINGASSIST_OPERATIONS_API_URL string = '${backendUrl}/operations'
 output BACKEND_CONTAINER_APP_NAME string = backendAppName
+output SERVICE_BACKEND_RESOURCE_ID string = backend.outputs.appId
 output BUILDINGASSIST_MCP_SERVER_URL string = apim.outputs.operationsMcpEndpoint
 output BUILDINGASSIST_MCP_CONNECTION string = operationsMcpConnection.outputs.connectionName
 output SRE_AGENT_NAME string = sreAgent.outputs.agentName

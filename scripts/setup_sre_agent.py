@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 from urllib.error import HTTPError
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
 
 ARM_SCOPE = "https://management.azure.com/.default"
@@ -26,6 +26,13 @@ CONFIG_RESPONSE_PLAN_NAME = "building-config-availability"
 CONFIG_ROOT = Path(__file__).resolve().parents[1] / "sre-config"
 CONFIG_SKILL_PATH = CONFIG_ROOT / "skills" / "repair-buildingassist-operations-config.md"
 CONFIG_HANDLER_PATH = CONFIG_ROOT / "instructions" / "platform-config-operator.md"
+CHAT_PLAYBOOK_PATH = CONFIG_ROOT / "instructions" / "chat-config-repair-playbook.md"
+
+# Everything between these markers is owned by this script; operator text outside is preserved.
+CHAT_START = "<!-- BEGIN BUILDINGASSIST MANAGED PLAYBOOK -->"
+CHAT_END = "<!-- END BUILDINGASSIST MANAGED PLAYBOOK -->"
+CHAT_INSTRUCTIONS_PATH = "api/v2/agent/customInstructions"
+CONFIG_WRITE_TOOL = "RunAzCliWriteCommands"
 
 SECURITY_TOOLS = [
     "SearchMemory",
@@ -76,6 +83,11 @@ Do not change Azure resources, restart services, retry access requests, expose
 secrets or personal data, or implement the fix. The GitHub issue is the handoff to
 the coding agent and requires human assignment. If GitHub CLI authentication is
 unavailable, report the exact command error instead of claiming an issue was filed.
+
+Some BuildingAssist 5xx responses are deployment configuration faults rather than
+code defects: they return HTTP 503 with the `configuration_error` error code and a
+`CFG-` incident id. Record that evidence and report the misclassification. Do not
+repair those failures and do not open a code-defect issue for them.
 """
 
 
@@ -155,6 +167,70 @@ def _repository_url() -> str:
     if remote.startswith("https://github.com/"):
         return remote.removesuffix(".git")
     return ""
+
+
+def _merge_chat_instructions(existing: str, block: str) -> str:
+    starts = existing.count(CHAT_START)
+    ends = existing.count(CHAT_END)
+    if starts != ends or starts > 1:
+        raise RuntimeError("Chat instructions contain malformed managed markers; not writing.")
+    if starts == 1 and existing.index(CHAT_START) > existing.index(CHAT_END):
+        raise RuntimeError("Chat instructions contain reversed managed markers; not writing.")
+
+    managed = f"{CHAT_START}\n{block.strip()}\n{CHAT_END}"
+    if starts == 0:
+        return f"{existing.rstrip()}\n\n{managed}" if existing.strip() else managed
+    head, _, remainder = existing.partition(CHAT_START)
+    _, _, tail = remainder.partition(CHAT_END)
+    return f"{head}{managed}{tail}"
+
+
+def _chat_target() -> dict[str, str]:
+    resource_id = os.environ.get("SERVICE_BACKEND_RESOURCE_ID", "").strip().rstrip("/")
+    backend_url = os.environ.get("SERVICE_BACKEND_URL", "").strip().rstrip("/")
+    if not resource_id or not backend_url:
+        raise RuntimeError(
+            "SERVICE_BACKEND_RESOURCE_ID and SERVICE_BACKEND_URL are required "
+            "to configure a matching backend for the chat playbook."
+        )
+    app_name = resource_id.rsplit("/", 1)[-1]
+    host = urlsplit(backend_url).hostname or ""
+    if not app_name or host.split(".")[0] != app_name:
+        raise RuntimeError(
+            f"Refusing to write chat instructions without a matching backend: "
+            f"{resource_id} does not serve {backend_url}."
+        )
+    return {
+        "RG": resource_id.split("/resourceGroups/")[-1].split("/")[0],
+        "BACKEND_APP": app_name,
+        "BACKEND_URL": backend_url,
+    }
+
+
+def _ensure_chat_playbook(endpoint: str, token: str) -> None:
+    values = _chat_target()
+    repair_enabled = os.environ.get("SRE_CONFIG_REPAIR_ENABLED", "").strip().lower() == "true"
+
+    roster = _request_json("GET", f"{endpoint}/api/v2/agent/tools", token)
+    known = {tool.get("name") for tool in roster.get("data", roster.get("value", []))}
+    if repair_enabled and CONFIG_WRITE_TOOL not in known:
+        raise RuntimeError(
+            f"Repair is enabled but the SRE Agent has no {CONFIG_WRITE_TOOL} tool; "
+            "the playbook would promise a repair it cannot perform."
+        )
+
+    block = _render_config(CHAT_PLAYBOOK_PATH, {**values, "REPAIR_ENABLED": str(repair_enabled).lower()})
+    url = f"{endpoint}/{CHAT_INSTRUCTIONS_PATH}"
+
+    current = _request_json("GET", url, token)
+    if not isinstance(current, dict) or "instructions" not in current:
+        raise RuntimeError("Unrecognized chat instructions schema; refusing to overwrite.")
+    merged = _merge_chat_instructions(current.get("instructions") or "", block)
+    _request_json("PUT", url, token, {**current, "instructions": merged})
+
+    if _request_json("GET", url, token).get("instructions") != merged:
+        raise RuntimeError("The chat playbook did not persist; inspect the SRE Agent manually.")
+    print(f"Configured the main-chat repair playbook (repair enabled: {repair_enabled}).")
 
 
 def _ensure_handler(endpoint: str, token: str) -> None:
@@ -340,11 +416,16 @@ def _ensure_repository(endpoint: str, token: str) -> None:
 
 
 def main() -> int:
+    # Chat setup only touches SRE data-plane instructions, so it needs fewer deployment outputs.
+    chat_only = "--chat-config-only" in sys.argv[1:]
     subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID", "")
     resource_group = os.environ.get("AZURE_RESOURCE_GROUP", "")
     agent_name = os.environ.get("SRE_AGENT_NAME", "")
     backend_app_name = os.environ.get("BACKEND_CONTAINER_APP_NAME", "")
-    if not all((subscription_id, resource_group, agent_name, backend_app_name)):
+    required = [subscription_id, resource_group, agent_name]
+    if not chat_only:
+        required.append(backend_app_name)
+    if not all(required):
         print("SRE Agent outputs are unavailable; skipping incident workflow setup.")
         return 0
 
@@ -366,8 +447,12 @@ def main() -> int:
         raise RuntimeError("The SRE Agent endpoint is unavailable.")
 
     config_values = {"RG": resource_group, "BACKEND_APP": backend_app_name}
-    config_skill_name = _ensure_skill(endpoint, sre_token, config_values)
+    _ensure_chat_playbook(endpoint, sre_token)
     _ensure_handler(endpoint, sre_token)
+    if chat_only:
+        return 0
+
+    config_skill_name = _ensure_skill(endpoint, sre_token, config_values)
     _ensure_config_handler(endpoint, sre_token, config_values, config_skill_name)
     _delete_default_response_plan(endpoint, sre_token)
     _ensure_response_plan(

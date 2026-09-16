@@ -1,6 +1,8 @@
 metadata description = '''
 Azure API Management AI Gateway tier (preview) with a managed-identity Foundry
-provider, GPT-5-mini registration, structured token policy, and an OpenAPI ToolServer.
+provider, a Model Router registration that falls back to GPT-5-mini, and an
+OpenAPI ToolServer, all governed by structured token, request rate limit, and
+content safety policies.
 '''
 
 @allowed([
@@ -31,9 +33,45 @@ param modelName string
 @description('Version of the model behind the Foundry deployment.')
 param modelVersion string
 
+@description('Resource ID of the Model Router deployment fronted by the gateway.')
+param routerModelDeploymentId string
+
+@description('Model Router deployment name clients send in the model field.')
+param routerModelDeploymentName string
+
+@description('Underlying Foundry model name behind the Model Router deployment.')
+param routerModelName string
+
+@description('Version of the model behind the Model Router deployment.')
+param routerModelVersion string
+
+@minValue(1)
+@description('Consecutive Model Router failures that trip the fallback to the secondary model.')
+param fallbackFailureThreshold int = 3
+
+@minValue(1)
+@description('How long traffic keeps flowing to the fallback model after the circuit trips.')
+param fallbackTripDurationSeconds int = 60
+
 @minValue(1)
 @description('Per-caller token allowance for the registered model during each minute.')
 param tokenLimitPerMinute int = 30000
+
+@minValue(1)
+@description('Per-caller request allowance for the registered model and tool server during each rate limit window.')
+param requestLimitPerPeriod int = 120
+
+@minValue(1)
+@description('Length of the request rate limit window in seconds.')
+param requestLimitPeriodSeconds int = 60
+
+@allowed([
+  'Low'
+  'Medium'
+  'High'
+])
+@description('Severity threshold applied to every content safety category before a prompt is blocked. Medium is balanced filtering.')
+param contentSafetySeverity string = 'Medium'
 
 @description('Public base URL of the BuildingAssist backend API.')
 param backendUrl string
@@ -141,6 +179,69 @@ resource model 'Microsoft.ApiManagement/service/workspaces/modelProviders/models
         count: tokenLimitPerMinute
         counterKey: 'Identity'
       }
+      {
+        type: 'requestRateLimit'
+        callsPerPeriod: requestLimitPerPeriod
+        periodSeconds: requestLimitPeriodSeconds
+        counterKey: 'Identity'
+      }
+      {
+        type: 'contentSafety'
+        hateSeverity: contentSafetySeverity
+        selfHarmSeverity: contentSafetySeverity
+        sexualSeverity: contentSafetySeverity
+        violenceSeverity: contentSafetySeverity
+      }
+    ]
+  }
+}
+
+resource routerModel 'Microsoft.ApiManagement/service/workspaces/modelProviders/models@2025-09-01-preview' = {
+  parent: foundryProvider
+  name: routerModelDeploymentName
+  properties: {
+    description: '${routerModelName} exposed through the BuildingAssist AI Gateway, falling back to ${modelDeploymentName}.'
+    displayName: routerModelDeploymentName
+    apiFormat: 'OpenAIChatCompletions'
+    supportedEndpoints: [
+      '/openai/v1/chat/completions'
+      '/openai/v1/responses'
+    ]
+    deployment: {
+      resourceId: routerModelDeploymentId
+      modelName: routerModelName
+      modelVersion: routerModelVersion
+    }
+    policies: [
+      {
+        type: 'tokenLimit'
+        period: 'minute'
+        count: tokenLimitPerMinute
+        counterKey: 'Identity'
+      }
+      {
+        type: 'requestRateLimit'
+        callsPerPeriod: requestLimitPerPeriod
+        periodSeconds: requestLimitPeriodSeconds
+        counterKey: 'Identity'
+      }
+      {
+        type: 'fallback'
+        threshold: fallbackFailureThreshold
+        tripDurationSeconds: fallbackTripDurationSeconds
+        fallbackTargets: [
+          {
+            modelId: model.id
+          }
+        ]
+      }
+      {
+        type: 'contentSafety'
+        hateSeverity: contentSafetySeverity
+        selfHarmSeverity: contentSafetySeverity
+        sexualSeverity: contentSafetySeverity
+        violenceSeverity: contentSafetySeverity
+      }
     ]
   }
 }
@@ -169,6 +270,21 @@ resource operationsToolServer 'Microsoft.ApiManagement/service/workspaces/toolSe
         required: true
       }
     ]
+    policies: [
+      {
+        type: 'requestRateLimit'
+        callsPerPeriod: requestLimitPerPeriod
+        periodSeconds: requestLimitPeriodSeconds
+        counterKey: 'Identity'
+      }
+      {
+        type: 'contentSafety'
+        hateSeverity: contentSafetySeverity
+        selfHarmSeverity: contentSafetySeverity
+        sexualSeverity: contentSafetySeverity
+        violenceSeverity: contentSafetySeverity
+      }
+    ]
   }
 }
 
@@ -183,7 +299,9 @@ resource runtimeApiKey 'Microsoft.ApiManagement/service/apiKeys@2025-09-01-previ
 output apimId string = aiGateway.id
 output gatewayUrl string = aiGateway.properties.gatewayUrl
 output modelEndpoint string = '${aiGateway.properties.gatewayUrl}/default/models/openai/v1'
+// The gateway path is the fixed-model demo path, so this stays the direct deployment.
 output modelName string = model.name
+output routerModelName string = routerModel.name
 output runtimeApiKeyId string = runtimeApiKey.id
 output connectorNamespaceId string = connectorNamespace.id
 output operationsMcpEndpoint string = '${aiGateway.properties.gatewayUrl}/default/toolservers/${operationsToolServerName}/mcp'

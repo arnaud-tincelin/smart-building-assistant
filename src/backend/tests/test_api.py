@@ -46,10 +46,16 @@ def test_invalid_operations_source_returns_diagnosable_503(
     monkeypatch.setattr("app.main.settings.operations_source", "digital-twins-prod")
     caplog.set_level("ERROR", logger="buildingassist.api")
 
-    response = client.get("/healthz", headers={"Origin": "https://frontend.example"})
+    # Liveness stays green so the misconfigured revision becomes ready and investigable.
+    assert client.get("/healthz").status_code == 200
+
+    response = client.get(
+        "/operations/buildings", headers={"Origin": "https://frontend.example"}
+    )
 
     assert response.status_code == 503
-    assert response.json()["detail"]["code"] == "invalid_runtime_configuration"
+    assert response.headers["x-error-code"] == "configuration_error"
+    assert response.headers["x-incident-id"] in response.json()["detail"]
     assert response.headers["access-control-allow-origin"] == "*"
     assert any("CONFIG_ERROR" in record.message for record in caplog.records)
 

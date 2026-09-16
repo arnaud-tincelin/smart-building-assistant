@@ -5,10 +5,10 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.45.15.27210",
-      "templateHash": "13822365251708380456"
+      "version": "0.37.4.10188",
+      "templateHash": "7532193577311765557"
     },
-    "description": "Azure API Management AI Gateway tier (preview) with a managed-identity Foundry\nprovider, Model Router registration, structured token policy, and an OpenAPI ToolServer.\n"
+    "description": "Azure API Management AI Gateway tier (preview) with a managed-identity Foundry\r\nprovider, a Model Router registration that falls back to GPT-5-mini, and an\r\nOpenAPI ToolServer, all governed by structured token, request rate limit, and\r\ncontent safety policies.\r\n"
   },
   "parameters": {
     "location": {
@@ -54,10 +54,56 @@
         "description": "Model deployment name clients send in the model field."
       }
     },
+    "modelName": {
+      "type": "string",
+      "metadata": {
+        "description": "Underlying Foundry model name, separate from the deployment identifier."
+      }
+    },
     "modelVersion": {
       "type": "string",
       "metadata": {
         "description": "Version of the model behind the Foundry deployment."
+      }
+    },
+    "routerModelDeploymentId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the Model Router deployment fronted by the gateway."
+      }
+    },
+    "routerModelDeploymentName": {
+      "type": "string",
+      "metadata": {
+        "description": "Model Router deployment name clients send in the model field."
+      }
+    },
+    "routerModelName": {
+      "type": "string",
+      "metadata": {
+        "description": "Underlying Foundry model name behind the Model Router deployment."
+      }
+    },
+    "routerModelVersion": {
+      "type": "string",
+      "metadata": {
+        "description": "Version of the model behind the Model Router deployment."
+      }
+    },
+    "fallbackFailureThreshold": {
+      "type": "int",
+      "defaultValue": 3,
+      "minValue": 1,
+      "metadata": {
+        "description": "Consecutive Model Router failures that trip the fallback to the secondary model."
+      }
+    },
+    "fallbackTripDurationSeconds": {
+      "type": "int",
+      "defaultValue": 60,
+      "minValue": 1,
+      "metadata": {
+        "description": "How long traffic keeps flowing to the fallback model after the circuit trips."
       }
     },
     "tokenLimitPerMinute": {
@@ -68,6 +114,34 @@
         "description": "Per-caller token allowance for the registered model during each minute."
       }
     },
+    "requestLimitPerPeriod": {
+      "type": "int",
+      "defaultValue": 120,
+      "minValue": 1,
+      "metadata": {
+        "description": "Per-caller request allowance for the registered model and tool server during each rate limit window."
+      }
+    },
+    "requestLimitPeriodSeconds": {
+      "type": "int",
+      "defaultValue": 60,
+      "minValue": 1,
+      "metadata": {
+        "description": "Length of the request rate limit window in seconds."
+      }
+    },
+    "contentSafetySeverity": {
+      "type": "string",
+      "defaultValue": "Medium",
+      "allowedValues": [
+        "Low",
+        "Medium",
+        "High"
+      ],
+      "metadata": {
+        "description": "Severity threshold applied to every content safety category before a prompt is blocked. Medium is balanced filtering."
+      }
+    },
     "backendUrl": {
       "type": "string",
       "metadata": {
@@ -76,7 +150,7 @@
     }
   },
   "variables": {
-    "$fxv#0": "{\n  \"openapi\": \"3.0.3\",\n  \"info\": {\n    \"title\": \"Contoso Building Operations API\",\n    \"version\": \"1.0.0\",\n    \"description\": \"Fictional building metadata, telemetry, alerts, and bounded actions for the BuildingAssist demo.\"\n  },\n  \"servers\": [\n    {\n      \"url\": \"__BACKEND_URL__\"\n    }\n  ],\n  \"paths\": {\n    \"/operations/buildings\": {\n      \"get\": {\n        \"operationId\": \"listBuildings\",\n        \"summary\": \"List buildings\",\n        \"description\": \"List buildings available in the simulated operations platform.\",\n        \"responses\": {\n          \"200\": {\n            \"description\": \"The simulated building portfolio.\",\n            \"content\": {\n              \"application/json\": {\n                \"schema\": {\n                  \"type\": \"object\"\n                }\n              }\n            }\n          }\n        }\n      }\n    },\n    \"/operations/buildings/{building_id}/information\": {\n      \"get\": {\n        \"operationId\": \"getBuildingInformation\",\n        \"summary\": \"Get building information\",\n        \"description\": \"Get authoritative metadata, specificities, zones, and policy for a building.\",\n        \"parameters\": [\n          {\n            \"name\": \"building_id\",\n            \"in\": \"path\",\n            \"required\": true,\n            \"description\": \"Building identifier returned by listBuildings.\",\n            \"schema\": {\n              \"type\": \"string\",\n              \"minLength\": 1,\n              \"maxLength\": 64\n            }\n          }\n        ],\n        \"responses\": {\n          \"200\": {\n            \"description\": \"Stable information for the requested building.\",\n            \"content\": {\n              \"application/json\": {\n                \"schema\": {\n                  \"type\": \"object\"\n                }\n              }\n            }\n          },\n          \"400\": {\n            \"description\": \"The building identifier is unknown.\"\n          }\n        }\n      }\n    },\n    \"/operations/buildings/{building_id}/data\": {\n      \"get\": {\n        \"operationId\": \"getBuildingData\",\n        \"summary\": \"Get current building data\",\n        \"description\": \"Get time-stamped telemetry, zone measurements, and active alerts for a building.\",\n        \"parameters\": [\n          {\n            \"name\": \"building_id\",\n            \"in\": \"path\",\n            \"required\": true,\n            \"description\": \"Building identifier returned by listBuildings.\",\n            \"schema\": {\n              \"type\": \"string\",\n              \"minLength\": 1,\n              \"maxLength\": 64\n            }\n          }\n        ],\n        \"responses\": {\n          \"200\": {\n            \"description\": \"Current simulated data for the requested building.\",\n            \"content\": {\n              \"application/json\": {\n                \"schema\": {\n                  \"type\": \"object\"\n                }\n              }\n            }\n          },\n          \"400\": {\n            \"description\": \"The building identifier is unknown.\"\n          }\n        }\n      }\n    },\n    \"/operations/work-orders\": {\n      \"post\": {\n        \"operationId\": \"createWorkOrder\",\n        \"summary\": \"Create a work order\",\n        \"description\": \"Create a fictional maintenance work order in the simulator.\",\n        \"requestBody\": {\n          \"required\": true,\n          \"content\": {\n            \"application/json\": {\n              \"schema\": {\n                \"type\": \"object\",\n                \"required\": [\n                  \"building_id\",\n                  \"title\",\n                  \"reason\"\n                ],\n                \"properties\": {\n                  \"building_id\": {\n                    \"type\": \"string\",\n                    \"description\": \"Building identifier returned by listBuildings.\"\n                  },\n                  \"title\": {\n                    \"type\": \"string\",\n                    \"description\": \"Short maintenance work order title.\"\n                  },\n                  \"reason\": {\n                    \"type\": \"string\",\n                    \"description\": \"Sourced reason for creating the work order.\"\n                  },\n                  \"priority\": {\n                    \"type\": \"string\",\n                    \"enum\": [\n                      \"low\",\n                      \"medium\",\n                      \"high\"\n                    ],\n                    \"default\": \"medium\"\n                  }\n                }\n              }\n            }\n          }\n        },\n        \"responses\": {\n          \"200\": {\n            \"description\": \"The created fictional work order.\",\n            \"content\": {\n              \"application/json\": {\n                \"schema\": {\n                  \"type\": \"object\"\n                }\n              }\n            }\n          },\n          \"400\": {\n            \"description\": \"The request violates the simulator policy.\"\n          }\n        }\n      }\n    },\n    \"/operations/hvac-setpoints\": {\n      \"post\": {\n        \"operationId\": \"setHvacSetpoint\",\n        \"summary\": \"Set a temporary HVAC setpoint\",\n        \"description\": \"Apply a temporary fictional HVAC setpoint after explicit confirmation.\",\n        \"requestBody\": {\n          \"required\": true,\n          \"content\": {\n            \"application/json\": {\n              \"schema\": {\n                \"type\": \"object\",\n                \"required\": [\n                  \"building_id\",\n                  \"zone_id\",\n                  \"temperature_c\",\n                  \"duration_minutes\",\n                  \"reason\"\n                ],\n                \"properties\": {\n                  \"building_id\": {\n                    \"type\": \"string\"\n                  },\n                  \"zone_id\": {\n                    \"type\": \"string\"\n                  },\n                  \"temperature_c\": {\n                    \"type\": \"number\"\n                  },\n                  \"duration_minutes\": {\n                    \"type\": \"integer\"\n                  },\n                  \"reason\": {\n                    \"type\": \"string\"\n                  },\n                  \"confirmed\": {\n                    \"type\": \"string\",\n                    \"enum\": [\n                      \"true\",\n                      \"false\"\n                    ],\n                    \"default\": \"false\"\n                  }\n                }\n              }\n            }\n          }\n        },\n        \"responses\": {\n          \"200\": {\n            \"description\": \"Confirmation request or applied fictional setpoint.\",\n            \"content\": {\n              \"application/json\": {\n                \"schema\": {\n                  \"type\": \"object\"\n                }\n              }\n            }\n          },\n          \"400\": {\n            \"description\": \"The request violates the simulator policy.\"\n          }\n        }\n      }\n    }\n  }\n}\n",
+    "$fxv#0": "{\r\n  \"openapi\": \"3.0.3\",\r\n  \"info\": {\r\n    \"title\": \"Contoso Building Operations API\",\r\n    \"version\": \"1.0.0\",\r\n    \"description\": \"Fictional building metadata, telemetry, alerts, and bounded actions for the BuildingAssist demo.\"\r\n  },\r\n  \"servers\": [\r\n    {\r\n      \"url\": \"__BACKEND_URL__\"\r\n    }\r\n  ],\r\n  \"paths\": {\r\n    \"/operations/buildings\": {\r\n      \"get\": {\r\n        \"operationId\": \"listBuildings\",\r\n        \"summary\": \"List buildings\",\r\n        \"description\": \"List buildings available in the simulated operations platform.\",\r\n        \"responses\": {\r\n          \"200\": {\r\n            \"description\": \"The simulated building portfolio.\",\r\n            \"content\": {\r\n              \"application/json\": {\r\n                \"schema\": {\r\n                  \"type\": \"object\"\r\n                }\r\n              }\r\n            }\r\n          }\r\n        }\r\n      }\r\n    },\r\n    \"/operations/buildings/{building_id}/information\": {\r\n      \"get\": {\r\n        \"operationId\": \"getBuildingInformation\",\r\n        \"summary\": \"Get building information\",\r\n        \"description\": \"Get authoritative metadata, specificities, zones, and policy for a building.\",\r\n        \"parameters\": [\r\n          {\r\n            \"name\": \"building_id\",\r\n            \"in\": \"path\",\r\n            \"required\": true,\r\n            \"description\": \"Building identifier returned by listBuildings.\",\r\n            \"schema\": {\r\n              \"type\": \"string\",\r\n              \"minLength\": 1,\r\n              \"maxLength\": 64\r\n            }\r\n          }\r\n        ],\r\n        \"responses\": {\r\n          \"200\": {\r\n            \"description\": \"Stable information for the requested building.\",\r\n            \"content\": {\r\n              \"application/json\": {\r\n                \"schema\": {\r\n                  \"type\": \"object\"\r\n                }\r\n              }\r\n            }\r\n          },\r\n          \"400\": {\r\n            \"description\": \"The building identifier is unknown.\"\r\n          }\r\n        }\r\n      }\r\n    },\r\n    \"/operations/buildings/{building_id}/data\": {\r\n      \"get\": {\r\n        \"operationId\": \"getBuildingData\",\r\n        \"summary\": \"Get current building data\",\r\n        \"description\": \"Get time-stamped telemetry, zone measurements, and active alerts for a building.\",\r\n        \"parameters\": [\r\n          {\r\n            \"name\": \"building_id\",\r\n            \"in\": \"path\",\r\n            \"required\": true,\r\n            \"description\": \"Building identifier returned by listBuildings.\",\r\n            \"schema\": {\r\n              \"type\": \"string\",\r\n              \"minLength\": 1,\r\n              \"maxLength\": 64\r\n            }\r\n          }\r\n        ],\r\n        \"responses\": {\r\n          \"200\": {\r\n            \"description\": \"Current simulated data for the requested building.\",\r\n            \"content\": {\r\n              \"application/json\": {\r\n                \"schema\": {\r\n                  \"type\": \"object\"\r\n                }\r\n              }\r\n            }\r\n          },\r\n          \"400\": {\r\n            \"description\": \"The building identifier is unknown.\"\r\n          }\r\n        }\r\n      }\r\n    },\r\n    \"/operations/work-orders\": {\r\n      \"post\": {\r\n        \"operationId\": \"createWorkOrder\",\r\n        \"summary\": \"Create a work order\",\r\n        \"description\": \"Create a fictional maintenance work order in the simulator.\",\r\n        \"requestBody\": {\r\n          \"required\": true,\r\n          \"content\": {\r\n            \"application/json\": {\r\n              \"schema\": {\r\n                \"type\": \"object\",\r\n                \"required\": [\r\n                  \"building_id\",\r\n                  \"title\",\r\n                  \"reason\"\r\n                ],\r\n                \"properties\": {\r\n                  \"building_id\": {\r\n                    \"type\": \"string\",\r\n                    \"description\": \"Building identifier returned by listBuildings.\"\r\n                  },\r\n                  \"title\": {\r\n                    \"type\": \"string\",\r\n                    \"description\": \"Short maintenance work order title.\"\r\n                  },\r\n                  \"reason\": {\r\n                    \"type\": \"string\",\r\n                    \"description\": \"Sourced reason for creating the work order.\"\r\n                  },\r\n                  \"priority\": {\r\n                    \"type\": \"string\",\r\n                    \"enum\": [\r\n                      \"low\",\r\n                      \"medium\",\r\n                      \"high\"\r\n                    ],\r\n                    \"default\": \"medium\"\r\n                  }\r\n                }\r\n              }\r\n            }\r\n          }\r\n        },\r\n        \"responses\": {\r\n          \"200\": {\r\n            \"description\": \"The created fictional work order.\",\r\n            \"content\": {\r\n              \"application/json\": {\r\n                \"schema\": {\r\n                  \"type\": \"object\"\r\n                }\r\n              }\r\n            }\r\n          },\r\n          \"400\": {\r\n            \"description\": \"The request violates the simulator policy.\"\r\n          }\r\n        }\r\n      }\r\n    },\r\n    \"/operations/hvac-setpoints\": {\r\n      \"post\": {\r\n        \"operationId\": \"setHvacSetpoint\",\r\n        \"summary\": \"Set a temporary HVAC setpoint\",\r\n        \"description\": \"Apply a temporary fictional HVAC setpoint after explicit confirmation.\",\r\n        \"requestBody\": {\r\n          \"required\": true,\r\n          \"content\": {\r\n            \"application/json\": {\r\n              \"schema\": {\r\n                \"type\": \"object\",\r\n                \"required\": [\r\n                  \"building_id\",\r\n                  \"zone_id\",\r\n                  \"temperature_c\",\r\n                  \"duration_minutes\",\r\n                  \"reason\"\r\n                ],\r\n                \"properties\": {\r\n                  \"building_id\": {\r\n                    \"type\": \"string\"\r\n                  },\r\n                  \"zone_id\": {\r\n                    \"type\": \"string\"\r\n                  },\r\n                  \"temperature_c\": {\r\n                    \"type\": \"number\"\r\n                  },\r\n                  \"duration_minutes\": {\r\n                    \"type\": \"integer\"\r\n                  },\r\n                  \"reason\": {\r\n                    \"type\": \"string\"\r\n                  },\r\n                  \"confirmed\": {\r\n                    \"type\": \"string\",\r\n                    \"enum\": [\r\n                      \"true\",\r\n                      \"false\"\r\n                    ],\r\n                    \"default\": \"false\"\r\n                  }\r\n                }\r\n              }\r\n            }\r\n          }\r\n        },\r\n        \"responses\": {\r\n          \"200\": {\r\n            \"description\": \"Confirmation request or applied fictional setpoint.\",\r\n            \"content\": {\r\n              \"application/json\": {\r\n                \"schema\": {\r\n                  \"type\": \"object\"\r\n                }\r\n              }\r\n            }\r\n          },\r\n          \"400\": {\r\n            \"description\": \"The request violates the simulator policy.\"\r\n          }\r\n        }\r\n      }\r\n    }\r\n  }\r\n}\r\n",
     "foundryUserRoleId": "53ca6127-db72-4b80-b1b0-d745d6d5456d",
     "normalizedFoundryEndpoint": "[if(endsWith(parameters('foundryEndpoint'), '/'), parameters('foundryEndpoint'), format('{0}/', parameters('foundryEndpoint')))]",
     "operationsToolServerName": "building-operations",
@@ -130,7 +204,7 @@
     "gatewayFoundryUser": {
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('foundryAccountName'))]",
+      "scope": "[format('Microsoft.CognitiveServices/accounts/{0}', parameters('foundryAccountName'))]",
       "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('foundryAccountName')), resourceId('Microsoft.ApiManagement/service', parameters('apimName')), variables('foundryUserRoleId'))]",
       "properties": {
         "principalId": "[reference('aiGateway', '2025-09-01-preview', 'full').identity.principalId]",
@@ -172,7 +246,7 @@
       "apiVersion": "2025-09-01-preview",
       "name": "[format('{0}/{1}/{2}/{3}', parameters('apimName'), 'default', 'foundry', parameters('modelDeploymentName'))]",
       "properties": {
-        "description": "Model Router exposed through the BuildingAssist AI Gateway.",
+        "description": "[format('{0} exposed directly through the BuildingAssist AI Gateway.', parameters('modelName'))]",
         "displayName": "[parameters('modelDeploymentName')]",
         "apiFormat": "OpenAIChatCompletions",
         "supportedEndpoints": [
@@ -181,7 +255,7 @@
         ],
         "deployment": {
           "resourceId": "[parameters('modelDeploymentId')]",
-          "modelName": "[parameters('modelDeploymentName')]",
+          "modelName": "[parameters('modelName')]",
           "modelVersion": "[parameters('modelVersion')]"
         },
         "policies": [
@@ -190,11 +264,78 @@
             "period": "minute",
             "count": "[parameters('tokenLimitPerMinute')]",
             "counterKey": "Identity"
+          },
+          {
+            "type": "requestRateLimit",
+            "callsPerPeriod": "[parameters('requestLimitPerPeriod')]",
+            "periodSeconds": "[parameters('requestLimitPeriodSeconds')]",
+            "counterKey": "Identity"
+          },
+          {
+            "type": "contentSafety",
+            "hateSeverity": "[parameters('contentSafetySeverity')]",
+            "selfHarmSeverity": "[parameters('contentSafetySeverity')]",
+            "sexualSeverity": "[parameters('contentSafetySeverity')]",
+            "violenceSeverity": "[parameters('contentSafetySeverity')]"
           }
         ]
       },
       "dependsOn": [
         "foundryProvider"
+      ]
+    },
+    "routerModel": {
+      "type": "Microsoft.ApiManagement/service/workspaces/modelProviders/models",
+      "apiVersion": "2025-09-01-preview",
+      "name": "[format('{0}/{1}/{2}/{3}', parameters('apimName'), 'default', 'foundry', parameters('routerModelDeploymentName'))]",
+      "properties": {
+        "description": "[format('{0} exposed through the BuildingAssist AI Gateway, falling back to {1}.', parameters('routerModelName'), parameters('modelDeploymentName'))]",
+        "displayName": "[parameters('routerModelDeploymentName')]",
+        "apiFormat": "OpenAIChatCompletions",
+        "supportedEndpoints": [
+          "/openai/v1/chat/completions",
+          "/openai/v1/responses"
+        ],
+        "deployment": {
+          "resourceId": "[parameters('routerModelDeploymentId')]",
+          "modelName": "[parameters('routerModelName')]",
+          "modelVersion": "[parameters('routerModelVersion')]"
+        },
+        "policies": [
+          {
+            "type": "tokenLimit",
+            "period": "minute",
+            "count": "[parameters('tokenLimitPerMinute')]",
+            "counterKey": "Identity"
+          },
+          {
+            "type": "requestRateLimit",
+            "callsPerPeriod": "[parameters('requestLimitPerPeriod')]",
+            "periodSeconds": "[parameters('requestLimitPeriodSeconds')]",
+            "counterKey": "Identity"
+          },
+          {
+            "type": "fallback",
+            "threshold": "[parameters('fallbackFailureThreshold')]",
+            "tripDurationSeconds": "[parameters('fallbackTripDurationSeconds')]",
+            "fallbackTargets": [
+              {
+                "modelId": "[resourceId('Microsoft.ApiManagement/service/workspaces/modelProviders/models', parameters('apimName'), 'default', 'foundry', parameters('modelDeploymentName'))]"
+              }
+            ]
+          },
+          {
+            "type": "contentSafety",
+            "hateSeverity": "[parameters('contentSafetySeverity')]",
+            "selfHarmSeverity": "[parameters('contentSafetySeverity')]",
+            "sexualSeverity": "[parameters('contentSafetySeverity')]",
+            "violenceSeverity": "[parameters('contentSafetySeverity')]"
+          }
+        ]
+      },
+      "dependsOn": [
+        "foundryProvider",
+        "model"
       ]
     },
     "operationsToolServer": {
@@ -220,6 +361,21 @@
               "type": "none"
             },
             "required": true
+          }
+        ],
+        "policies": [
+          {
+            "type": "requestRateLimit",
+            "callsPerPeriod": "[parameters('requestLimitPerPeriod')]",
+            "periodSeconds": "[parameters('requestLimitPeriodSeconds')]",
+            "counterKey": "Identity"
+          },
+          {
+            "type": "contentSafety",
+            "hateSeverity": "[parameters('contentSafetySeverity')]",
+            "selfHarmSeverity": "[parameters('contentSafetySeverity')]",
+            "sexualSeverity": "[parameters('contentSafetySeverity')]",
+            "violenceSeverity": "[parameters('contentSafetySeverity')]"
           }
         ]
       },
@@ -255,6 +411,10 @@
     "modelName": {
       "type": "string",
       "value": "[parameters('modelDeploymentName')]"
+    },
+    "routerModelName": {
+      "type": "string",
+      "value": "[parameters('routerModelDeploymentName')]"
     },
     "runtimeApiKeyId": {
       "type": "string",

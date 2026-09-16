@@ -173,6 +173,7 @@ output projectPrincipalId string = project.identity.principalId
 output projectEndpoint string = 'https://${account.name}.services.ai.azure.com/api/projects/${project.name}'
 output modelDeploymentName string = modelDeployment.outputs.deploymentName
 output modelDeploymentId string = modelDeployment.outputs.deploymentId
+output modelName string = modelName
 output modelVersion string = modelVersion
 output modelCapacity int = modelCapacity
 output knowledgeModelDeploymentName string = knowledgeModelDeployment.name

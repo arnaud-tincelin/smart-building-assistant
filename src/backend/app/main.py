@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Callable
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -40,31 +41,48 @@ app = FastAPI(
 
 app.include_router(operations_router)
 
+OPERATIONS_SETTING = "BUILDINGASSIST_OPERATIONS_SOURCE"
+SUPPORTED_OPERATIONS_SOURCE = "simulator"
+
 
 @app.middleware("http")
 async def _require_supported_operations_source(
     request: Request,
     call_next: Callable,
-) -> JSONResponse:
-    if settings.operations_source != "simulator":
+) -> Response:
+    # Liveness must stay green so a misconfigured revision can go ready and be investigated.
+    if request.url.path == "/healthz":
+        return await call_next(request)
+    if settings.operations_source != SUPPORTED_OPERATIONS_SOURCE:
+        incident_id = f"CFG-{uuid4().hex[:8].upper()}"
         logger.error(
-            "CONFIG_ERROR unsupported operations source: source=%s path=%s",
+            "CONFIG_ERROR %s=%s supported=%s revision=%s path=%s incident=%s",
+            OPERATIONS_SETTING,
             settings.operations_source,
+            SUPPORTED_OPERATIONS_SOURCE,
+            os.environ.get("CONTAINER_APP_REVISION", "unknown"),
             request.url.path,
+            incident_id,
             extra={"operations_source": settings.operations_source},
         )
         return JSONResponse(
             status_code=503,
             content={
-                "detail": {
-                    "code": "invalid_runtime_configuration",
-                    "message": (
-                        "Building operations are unavailable due to deployment configuration."
-                    ),
-                }
+                "detail": (
+                    "Building operations unavailable: configuration_error "
+                    f"({incident_id}). The deployed operations source is not supported."
+                )
+            },
+            headers={
+                "X-Operations-Config": "v1",
+                "X-Error-Code": "configuration_error",
+                "X-Incident-ID": incident_id,
             },
         )
-    return await call_next(request)
+    response = await call_next(request)
+    # Capability marker the demo tooling probes for before it touches configuration.
+    response.headers["X-Operations-Config"] = "v1"
+    return response
 
 
 app.add_middleware(
