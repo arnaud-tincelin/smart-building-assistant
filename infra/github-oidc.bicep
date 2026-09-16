@@ -83,6 +83,43 @@ resource rbacAdministratorAssignment 'Microsoft.Authorization/roleAssignments@20
   }
 }
 
+// Role Based Access Control Administrator can assign roles but cannot write role
+// definitions. The application template creates its own narrowly scoped custom
+// roles (router control, SRE config repair), so the CI/CD identity also needs
+// this dedicated permission — not covered by any single built-in role short of
+// Owner.
+resource roleDefinitionWriterRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
+  name: guid(subscription().id, 'buildingassist-role-definition-writer')
+  properties: {
+    roleName: 'BuildingAssist role definition writer'
+    description: 'Create and delete the custom role definitions used by the BuildingAssist application template.'
+    type: 'CustomRole'
+    assignableScopes: [
+      subscription().id
+    ]
+    permissions: [
+      {
+        actions: [
+          'Microsoft.Authorization/roleDefinitions/write'
+          'Microsoft.Authorization/roleDefinitions/delete'
+        ]
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      }
+    ]
+  }
+}
+
+resource roleDefinitionWriterAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(subscription().id, deploymentIdentityId, 'buildingassist-role-definition-writer')
+  properties: {
+    principalId: deploymentIdentity.outputs.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: roleDefinitionWriterRole.id
+  }
+}
+
 output AZURE_CLIENT_ID string = deploymentIdentity.outputs.clientId
 output AZURE_PRINCIPAL_ID string = deploymentIdentity.outputs.principalId
 output AZURE_SUBSCRIPTION_ID string = subscription().subscriptionId
