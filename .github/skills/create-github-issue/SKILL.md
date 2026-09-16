@@ -1,9 +1,9 @@
 ---
+name: create-github-issue
 description: Create a well-structured GitHub issue following product and engineering best practices
-agent: agent
+disable-model-invocation: true
 argument-hint: Describe the feature, bug, enhancement, technical debt, or task to create as a GitHub issue
 ---
-
 # Goal
 
 Create a GitHub issue from the provided request.
