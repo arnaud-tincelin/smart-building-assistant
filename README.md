@@ -172,11 +172,12 @@ and smoke-tests both application URLs.
 
 The identity has **Contributor** and **Role Based Access Control Administrator** at
 subscription scope because the application template creates a resource group and
-its role assignments. It also gets a dedicated **BuildingAssist role definition
-writer** custom role, because Role Based Access Control Administrator can assign
-roles but cannot create or delete the custom role definitions the template
-provisions (router control, SRE config repair). Keep this demo subscription
-dedicated to the environment.
+its role assignments. The deployed template only assigns built-in roles, so the
+workflow identity never needs `Microsoft.Authorization/roleDefinitions/write`; the
+opt-in SRE configuration repair template (`infra/sre-config-repair.bicep`) is the
+only one that still defines a custom role, and the bootstrap grants the dedicated
+**BuildingAssist role definition writer** custom role for it. Keep this demo
+subscription dedicated to the environment.
 
 The workflow builds and browser-tests the assistant UI and runs backend API,
 model-routing, and tracing regression tests before deployment. Its

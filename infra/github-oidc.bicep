@@ -84,10 +84,10 @@ resource rbacAdministratorAssignment 'Microsoft.Authorization/roleAssignments@20
 }
 
 // Role Based Access Control Administrator can assign roles but cannot write role
-// definitions. The application template creates its own narrowly scoped custom
-// roles (router control, SRE config repair), so the CI/CD identity also needs
-// this dedicated permission — not covered by any single built-in role short of
-// Owner.
+// definitions. The application template deployed by the workflow only uses
+// built-in roles, so this grant is not required for `azd up`; it covers the
+// opt-in SRE configuration repair template, which still defines a custom role —
+// not covered by any single built-in role short of Owner.
 resource roleDefinitionWriterRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
   name: guid(subscription().id, 'buildingassist-role-definition-writer')
   properties: {

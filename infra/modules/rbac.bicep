@@ -32,34 +32,22 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
   name: modelDeploymentName
 }
 
-resource routerControlRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = if (enableRouterControl) {
-  name: guid(resourceGroup().id, 'buildingassist-model-router-control')
-  properties: {
-    roleName: 'BuildingAssist Model Router control (${resourceGroup().name})'
-    description: 'Read and update the single demo model deployment. No delete or key access.'
-    type: 'CustomRole'
-    assignableScopes: [
-      resourceGroup().id
-    ]
-    permissions: [
-      {
-        actions: [
-          'Microsoft.CognitiveServices/accounts/deployments/read'
-          'Microsoft.CognitiveServices/accounts/deployments/write'
-        ]
-        notActions: []
-        dataActions: []
-        notDataActions: []
-      }
-    ]
-  }
-}
+// Router control: the app reads and updates the routing mode of the single demo
+// model deployment. The built-in Cognitive Services Contributor role is assigned
+// on that deployment only — it grants no access to the parent account, so account
+// keys stay out of reach. A custom role definition is deliberately avoided here:
+// creating one requires Microsoft.Authorization/roleDefinitions/write, which the
+// deployment identity does not have.
+var cognitiveServicesContributorRoleId = '25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68'
 
 resource routerControlAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableRouterControl) {
-  name: guid(modelDeployment.id, appPrincipalId, 'buildingassist-model-router-control')
+  name: guid(modelDeployment.id, appPrincipalId, cognitiveServicesContributorRoleId)
   scope: modelDeployment
   properties: {
-    roleDefinitionId: routerControlRole!.id
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      cognitiveServicesContributorRoleId
+    )
     principalId: appPrincipalId
     principalType: 'ServicePrincipal'
   }
