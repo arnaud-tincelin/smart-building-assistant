@@ -89,6 +89,11 @@ test("three exchanges retain chronological messages, immutable model attribution
     await expect(reply.getByText(`response-${index}`, { exact: true })).toBeVisible();
     await expect(reply.getByText(`operations-tool-${index}`, { exact: true })).toBeVisible();
     await expect(reply.getByText(`Routing explanation ${index}.`, { exact: true })).toBeVisible();
+    const tokens = reply.locator(".execution-metrics > div").filter({
+      has: page.getByText("Response tokens", { exact: true }),
+    });
+    await expect(tokens.locator("dd")).toHaveText(String(10 + index));
+    await expect(replies(page).filter({ has: page.locator("details[open]") })).toHaveCount(1);
     await reply.getByText("Show more details", { exact: true }).click();
   }
 });
@@ -159,6 +164,46 @@ test("retained replies render Markdown safely including headings, lists, code, l
     expect(await page.evaluate(() => Reflect.get(window, "__unsafeExecuted"))).toBe(false);
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("wide Markdown and unsafe citations stay contained in their original replies", async ({ page }) => {
+  const columns = Array.from({ length: 60 }, (_, index) => `Column ${index}`);
+  await page.route("**/ask", (route) => route.fulfill({ json: {
+    answer: [
+      "```text", "building-status ".repeat(100), "```", "",
+      `| ${columns.join(" | ")} |`,
+      `| ${columns.map(() => "---").join(" | ")} |`,
+      `| ${columns.map(() => "Building measurement").join(" | ")} |`,
+    ].join("\n"),
+    citations: [{ title: "Unsafe source", url: "javascript:alert(1)", snippet: "Source evidence" }],
+  } }));
+  await page.goto("/");
+  await submit(page, "Wide report", 1);
+  await submit(page, "Another wide report", 2);
+  for (let index = 0; index < 2; index += 1) {
+    const reply = replies(page).nth(index);
+    for (const region of [reply.locator("pre"), reply.getByRole("region", { name: "Answer table" })]) {
+      await expect.poll(() => region.evaluate((element) =>
+        element.scrollWidth - element.clientWidth,
+      )).toBeGreaterThan(100);
+      await region.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+      expect(await region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(100);
+    }
+    await expect(reply.getByText("Unsafe source", { exact: true })).toBeVisible();
+    await expect(reply.getByRole("link", { name: "Unsafe source" })).toHaveCount(0);
+    await expect(reply.getByText("Source evidence", { exact: true })).toBeVisible();
+  }
+  expect(await history(page).evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("empty and short conversations do not require vertical scrolling", async ({ page }) => {
+  await page.route("**/ask", (route) => route.fulfill({ json: { answer: "OK", citations: [] } }));
+  await page.goto("/");
+  const log = history(page);
+  expect(await log.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
+  await submit(page, "Hi", 1);
+  expect(await log.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
 });
 
 test("delayed and failed requests retain previous exchanges and prompts and allow recovery without fake replies", async ({ page }) => {
@@ -284,5 +329,53 @@ test("overflowing history supports keyboard navigation, conditional auto-scroll 
   await expect(replies(page)).toHaveCount(5);
   await expect(users(page).first()).toBeInViewport();
   await expect(prompt(page)).toHaveValue("Question 5?");
+  await expect(ask(page)).toBeEnabled();
+});
+
+test("reading position survives mode and tab switches and a reply received on another tab", async ({ page }) => {
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  let count = 0;
+  await page.route("**/ask", async (route) => {
+    const index = ++count;
+    if (index === 3) await held;
+    await route.fulfill({ json: {
+      ...response(index),
+      answer: `Answer ${index}.\n\n` + "Building status paragraph.\n\n".repeat(40),
+    } });
+  });
+  await page.goto("/");
+  await submit(page, "First question", 1);
+  await submit(page, "Second question", 2);
+  const log = history(page);
+  const firstDetails = replies(page).first().locator(".routing-details");
+  await firstDetails.getByText("Show more details", { exact: true }).click();
+  await expect(firstDetails).toHaveAttribute("open", "");
+  const savedScroll = await log.evaluate((element) => {
+    element.scrollTop = element.scrollHeight - element.clientHeight - 100;
+    return element.scrollTop;
+  });
+  await expect.poll(() => log.evaluate((element) => element.scrollTop)).toBe(savedScroll);
+  await page.getByRole("button", { name: "AI Gateway", exact: true }).click();
+  await expect(log.getByRole("article")).toHaveCount(0);
+  await page.getByRole("button", { name: "Agents", exact: true }).click();
+  await expect(firstDetails).toHaveAttribute("open", "");
+  await expect.poll(() => log.evaluate((element) => element.scrollTop)).toBe(savedScroll);
+  await page.getByRole("button", { name: "Security & access", exact: true }).click();
+  await page.getByRole("button", { name: "Assistant", exact: true }).click();
+  await expect(firstDetails).toHaveAttribute("open", "");
+  await expect.poll(() => log.evaluate((element) => element.scrollTop)).toBe(savedScroll);
+  await prompt(page).fill("Third question");
+  await ask(page).click();
+  await expect(log.getByRole("status")).toHaveText("Asking…");
+  await page.getByRole("button", { name: "Security & access", exact: true }).click();
+  const completed = page.waitForResponse((value) => value.url().endsWith("/ask"));
+  release();
+  await completed;
+  await page.getByRole("button", { name: "Assistant", exact: true }).click();
+  await expect(replies(page)).toHaveCount(3);
+  await expect(firstDetails).toHaveAttribute("open", "");
+  await expect.poll(() => log.evaluate((element) => element.scrollTop)).toBe(savedScroll);
+  await expect(replies(page).last()).toContainText("Answer 3.");
   await expect(ask(page)).toBeEnabled();
 });

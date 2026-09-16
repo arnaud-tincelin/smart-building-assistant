@@ -65,7 +65,7 @@ BuildingAssist agent, so there is no agent selector:
 - The keyboard-focusable transcript scrolls independently of the composer.
   New replies follow the bottom only when you are already near it; reviewing
   older messages preserves your scroll position. Each mode retains its scroll
-  position across mode and tab switches.
+  position and expanded execution details across mode and tab switches.
 - Every reply renders GitHub-flavored Markdown, including tables and code, and
   retains its own sources and execution details. Wide tables and fenced code
   scroll within the reply rather than widening the page. Generated HTML is not

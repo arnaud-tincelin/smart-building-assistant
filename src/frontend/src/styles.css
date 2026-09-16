@@ -706,6 +706,11 @@ summary:focus-visible,
     flex-direction: column;
   }
 
+  .answer,
+  .user-message {
+    padding: 1rem;
+  }
+
   .ask-submit {
     min-height: 44px;
   }

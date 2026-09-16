@@ -56,6 +56,7 @@ export function App() {
     agents: [],
     gateway: [],
   });
+  const [expandedDetails, setExpandedDetails] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(false);
   const activeRequest = useRef<AbortController | null>(null);
   const nextTurnId = useRef(0);
@@ -319,7 +320,11 @@ export function App() {
                         {turn.outcome.response.answer}
                       </ReactMarkdown>
                     </div>
-                    <ExecutionDetails execution={turn.outcome.response.execution} />
+                    <ExecutionDetails execution={turn.outcome.response.execution}
+                      expanded={expandedDetails[turn.id] ?? false}
+                      onToggle={(expanded) => setExpandedDetails((previous) =>
+                        previous[turn.id] === expanded ? previous : { ...previous, [turn.id]: expanded },
+                      )} />
                     {turn.outcome.response.citations.length > 0 && (
                       <div className="citations">
                         <h3>Sources</h3>

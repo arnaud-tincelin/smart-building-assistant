@@ -4,7 +4,11 @@ function tokenCount(value: number | null | undefined): string {
   return value == null ? "Not reported" : value.toLocaleString("en-US");
 }
 
-export function ExecutionDetails({ execution }: { execution?: ModelExecution | null }) {
+export function ExecutionDetails({ execution, expanded, onToggle }: {
+  execution?: ModelExecution | null;
+  expanded?: boolean;
+  onToggle?: (expanded: boolean) => void;
+}) {
   if (!execution) {
     return <p className="execution-unavailable">Model details were not reported for this answer.</p>;
   }
@@ -31,7 +35,8 @@ export function ExecutionDetails({ execution }: { execution?: ModelExecution | n
           The service did not identify the underlying model. A deployment name is not model attribution.
         </p>
       )}
-      <details className="routing-details">
+      <details className="routing-details" open={expanded}
+        onToggle={(event) => onToggle?.(event.currentTarget.open)}>
         <summary>Show more details</summary>
         <dl className="execution-metrics">
           <div>
