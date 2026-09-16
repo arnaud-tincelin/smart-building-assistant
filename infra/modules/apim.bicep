@@ -1,6 +1,6 @@
 metadata description = '''
 Azure API Management AI Gateway tier (preview) with a managed-identity Foundry
-provider, Model Router registration, structured token policy, and an OpenAPI ToolServer.
+provider, GPT-5-mini registration, structured token policy, and an OpenAPI ToolServer.
 '''
 
 @allowed([
@@ -24,6 +24,9 @@ param modelDeploymentId string
 
 @description('Model deployment name clients send in the model field.')
 param modelDeploymentName string
+
+@description('Underlying Foundry model name, separate from the deployment identifier.')
+param modelName string
 
 @description('Version of the model behind the Foundry deployment.')
 param modelVersion string
@@ -119,7 +122,7 @@ resource model 'Microsoft.ApiManagement/service/workspaces/modelProviders/models
   parent: foundryProvider
   name: modelDeploymentName
   properties: {
-    description: 'Model Router exposed through the BuildingAssist AI Gateway.'
+    description: '${modelName} exposed directly through the BuildingAssist AI Gateway.'
     displayName: modelDeploymentName
     apiFormat: 'OpenAIChatCompletions'
     supportedEndpoints: [
@@ -128,7 +131,7 @@ resource model 'Microsoft.ApiManagement/service/workspaces/modelProviders/models
     ]
     deployment: {
       resourceId: modelDeploymentId
-      modelName: modelDeploymentName
+      modelName: modelName
       modelVersion: modelVersion
     }
     policies: [

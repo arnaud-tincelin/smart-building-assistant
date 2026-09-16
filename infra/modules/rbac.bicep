@@ -2,6 +2,8 @@ metadata description = 'Role assignments for the managed identity: ACR pull + Fo
 
 param registryName string
 param foundryAccountName string
+param modelDeploymentName string
+param enableRouterControl bool = false
 param searchServiceName string
 param appInsightsName string
 
@@ -23,6 +25,44 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' ex
 
 resource foundry 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
   name: foundryAccountName
+}
+
+resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-10-01-preview' existing = {
+  parent: foundry
+  name: modelDeploymentName
+}
+
+resource routerControlRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = if (enableRouterControl) {
+  name: guid(resourceGroup().id, 'buildingassist-model-router-control')
+  properties: {
+    roleName: 'BuildingAssist Model Router control (${resourceGroup().name})'
+    description: 'Read and update the single demo model deployment. No delete or key access.'
+    type: 'CustomRole'
+    assignableScopes: [
+      resourceGroup().id
+    ]
+    permissions: [
+      {
+        actions: [
+          'Microsoft.CognitiveServices/accounts/deployments/read'
+          'Microsoft.CognitiveServices/accounts/deployments/write'
+        ]
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      }
+    ]
+  }
+}
+
+resource routerControlAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableRouterControl) {
+  name: guid(modelDeployment.id, appPrincipalId, 'buildingassist-model-router-control')
+  scope: modelDeployment
+  properties: {
+    roleDefinitionId: routerControlRole!.id
+    principalId: appPrincipalId
+    principalType: 'ServicePrincipal'
+  }
 }
 
 resource search 'Microsoft.Search/searchServices@2025-05-01' existing = {

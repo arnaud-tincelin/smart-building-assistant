@@ -13,11 +13,12 @@ combines **Model Router**, a **Foundry IQ Knowledge Base**, and **MCP** tools.
 ```
 Frontend Container App (TypeScript SPA)
    └─ HTTP ─▶ Backend Container App (FastAPI)
-            ├─ Responses API ─▶ BuildingAssist prompt agent
-            │                    ├─ Model Router (Balanced)
-            │                    ├─ Foundry IQ Knowledge Base MCP (Azure AI Search)
-        │                    └─ AI Gateway building operations MCP
-        └─ /operations/* ─▶ simulated building REST API
+            ├─ Agents ─▶ Responses API ─▶ BuildingAssist prompt agent
+            │                            ├─ Model Router
+            │                            ├─ Foundry IQ Knowledge Base MCP (Azure AI Search)
+            │                            └─ AI Gateway building operations MCP
+            ├─ AI Gateway ─▶ gpt-5-mini + read-only building operations MCP
+            └─ /operations/* ─▶ simulated building REST API
 APIM AI Gateway (preview)
   ├─ Foundry model provider ─▶ governed model endpoint
   └─ OpenAPI ToolServer ─▶ /default/toolservers/building-operations/mcp
@@ -37,7 +38,48 @@ SRE Agent (Microsoft.App/agents, in Bicep) ─ watches: both Container Apps, Fou
   four Markdown sources are chunked and indexed idempotently after provision.
 - **Tracing** — the Foundry project is connected to workspace-based Application
   Insights for automatic prompt-agent traces. The backend adds correlated
-  OpenTelemetry spans with prompt and tool content recording disabled.
+  OpenTelemetry spans and token metrics without recording prompt, answer, or tool
+  argument content. It uses the public OpenTelemetry API rather than the SDK
+  Responses wrapper, which crashes on sampled-out spans in affected SDK releases.
+
+## Assistant UI
+
+The home page has **Agents** and **AI Gateway** buttons. There is only one
+BuildingAssist agent, so there is no agent selector:
+
+- **Agents** invokes that prompt agent, including its Foundry IQ knowledge and MCP tools.
+  Model Router is restricted to **gpt-4o-mini** and **gpt-5.6-sol**.
+- **AI Gateway** calls **gpt-5-mini** directly through the gateway. The backend runs a
+  bounded, read-only building-tool loop; this path does not invoke Foundry Agent
+  Service, use Model Router or Foundry IQ, or perform building actions.
+- Switching modes preserves the question, clears the previous result, and ignores
+  answers from requests started in the previous mode.
+- Each answer shows the model disclosed by the final response and the shared
+  router configuration at request start (or **Fixed model** for AI Gateway).
+  **Show more details** expands latency,
+  token usage, response ID, tool names, and routing context. Missing metadata is
+  explicitly marked as unavailable; a deployment name is never presented as the
+  underlying model. Gateway token totals cover all model calls only when every
+  call reports them. Router decision scores/reasoning are not exposed by the service.
+- **Security & access** remains a separate view with its existing SRE demo behavior.
+
+The **Router** menu is shown only in Agents mode and reads the shared deployment's
+Cost / Balanced / Quality setting. Its two-model allowlist is displayed below the
+control and preserved by mode changes. Editing is disabled by default. To opt this
+demo into editing:
+
+```bash
+azd env set BUILDINGASSIST_ENABLE_ROUTER_CONTROL true
+azd up
+```
+
+**Every visitor can then change the deployment for all agent users.**
+AI Gateway stays on gpt-5-mini regardless of the router mode.
+Changes can take up to five minutes to propagate. Keep editing disabled for a
+public production app until access is authenticated and authorized. The backend's
+managed identity receives a custom read/write role scoped to this one deployment,
+not Contributor on the Foundry account. Set the flag to `false` and redeploy to
+disable the API's write path.
 
 ## Prerequisites
 
@@ -74,6 +116,18 @@ cd src/backend
 uv run pytest
 ```
 
+Frontend browser tests (desktop and mobile):
+
+```bash
+cd src/frontend
+npx playwright install chromium
+npm test
+```
+
+Offline mock mode applies to the agent path only. Gateway mode requires the
+backend settings in [`.env.example`](src/backend/.env.example) and does not fall
+back to a canned agent answer.
+
 ## Deploy to Azure
 
 ```bash
@@ -83,7 +137,13 @@ azd env set AZURE_LOCATION swedencentral
 azd up                                # provision infra + build (ACR) + deploy both apps
 ```
 
-`azd up` provisions Model Router `2025-11-18` in Balanced mode, Azure AI Search,
+`azd up` provisions Model Router `2025-11-18` with only `gpt-4o-mini` (`2024-07-18`)
+and `gpt-5.6-sol` (`2026-07-09`) in its routing subset. These underlying OpenAI
+models do not need separate deployments for Model Router. New models are not
+automatically added to the allowlist. GPT-5-mini (`2025-08-07`) is declared in
+Bicep and shared by the fixed AI Gateway path and Foundry IQ.
+
+Provisioning also creates Azure AI Search,
 the Foundry IQ Knowledge Base, the APIM-hosted MCP endpoint, the visible prompt
 agent, and the required Foundry project connections. It also outputs the app,
 Foundry, Search, Application Insights, and APIM resource details.
@@ -114,10 +174,15 @@ The identity has **Contributor** and **Role Based Access Control Administrator**
 subscription scope because the application template creates a resource group and
 its role assignments. Keep this demo subscription dedicated to the environment.
 
+The workflow builds and browser-tests the assistant UI and runs backend API,
+model-routing, and tracing regression tests before deployment. Its
+non-secret repository variable `BUILDINGASSIST_ENABLE_ROUTER_CONTROL` controls the
+same demo opt-in as the local azd setting and defaults to `false`.
+
 ### AI Gateway tier (preview)
 
 The deployment creates the native APIM **AI Gateway** SKU and its default workspace,
-then registers Model Router as a managed-identity Foundry provider. It also creates a
+then registers gpt-5-mini through a managed-identity Foundry provider. It also creates a
 gateway runtime key, applies a per-caller token limit, exports token telemetry to the
 existing Application Insights resource, and keeps payload capture disabled. The same
 gateway imports the backend OpenAPI document into a workspace ToolServer and exposes
@@ -159,9 +224,11 @@ curl "${AI_GATEWAY_MODEL_ENDPOINT}/responses" \
 unset AI_GATEWAY_API_KEY
 ```
 
-The app's `/ask` path continues to invoke the Foundry prompt agent through its
-project endpoint. AI Gateway model passthrough does not proxy Foundry Agent Service
-`agent_reference` calls; direct model clients use `AI_GATEWAY_MODEL_ENDPOINT`.
+The app's `/ask` endpoint accepts `mode: "agents"` (the default) or
+`mode: "gateway"`. Agent requests use the Foundry project endpoint. Gateway requests
+use the gpt-5-mini deployment and read-only MCP tools; model passthrough does not
+proxy Foundry Agent Service `agent_reference` calls. Bicep injects the runtime key
+through a backend Container App secret reference, never through frontend configuration.
 
 The prompt agent is closed-book: every factual response requires an MCP tool call.
 Unsupported or incomplete requests return exactly `i don't know`; model knowledge is

@@ -24,6 +24,9 @@ param searchLocation string = 'centralus'
 @description('Publisher email for APIM.')
 param apimPublisherEmail string = 'demo@contoso-energy.example'
 
+@description('Allow all demo visitors to change the shared Model Router mode. Disable for public production use.')
+param enableRouterControl bool = false
+
 @description('Backend container image. Uses the starter image only before the first application deployment.')
 param backendImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
@@ -131,10 +134,11 @@ module apim 'modules/apim.bicep' = {
     publisherName: 'Contoso Energy'
     foundryAccountName: foundry.outputs.accountName
     foundryEndpoint: foundry.outputs.accountEndpoint
-    modelDeploymentId: foundry.outputs.modelDeploymentId
-    modelDeploymentName: foundry.outputs.modelDeploymentName
-    modelVersion: foundry.outputs.modelVersion
-    tokenLimitPerMinute: foundry.outputs.modelCapacity * 1000
+    modelDeploymentId: foundry.outputs.knowledgeModelDeploymentId
+    modelDeploymentName: foundry.outputs.knowledgeModelDeploymentName
+    modelName: foundry.outputs.knowledgeModelName
+    modelVersion: foundry.outputs.knowledgeModelVersion
+    tokenLimitPerMinute: foundry.outputs.knowledgeModelCapacity * 1000
     backendUrl: backendUrl
   }
 }
@@ -167,6 +171,7 @@ module backend 'modules/container-app.bicep' = {
     image: backendImage
     targetPort: 8000
     external: true
+    gatewayApiKey: apim.outputs.runtimeApiKey
     env: [
       {
         name: 'BUILDINGASSIST_PROJECT_ENDPOINT'
@@ -179,6 +184,30 @@ module backend 'modules/container-app.bicep' = {
       {
         name: 'BUILDINGASSIST_AGENT_NAME'
         value: 'buildingassist-agent'
+      }
+      {
+        name: 'BUILDINGASSIST_GATEWAY_MODEL_ENDPOINT'
+        value: apim.outputs.modelEndpoint
+      }
+      {
+        name: 'BUILDINGASSIST_GATEWAY_MODEL'
+        value: apim.outputs.modelName
+      }
+      {
+        name: 'BUILDINGASSIST_GATEWAY_API_KEY'
+        secretRef: 'ai-gateway-key'
+      }
+      {
+        name: 'BUILDINGASSIST_MCP_SERVER_URL'
+        value: apim.outputs.operationsMcpEndpoint
+      }
+      {
+        name: 'BUILDINGASSIST_MODEL_DEPLOYMENT_RESOURCE_ID'
+        value: foundry.outputs.modelDeploymentId
+      }
+      {
+        name: 'BUILDINGASSIST_ENABLE_ROUTER_CONTROL'
+        value: string(enableRouterControl)
       }
       {
         name: 'BUILDINGASSIST_KNOWLEDGE_MCP_ENDPOINT'
@@ -245,6 +274,8 @@ module rbac 'modules/rbac.bicep' = {
   params: {
     registryName: registry.outputs.registryName
     foundryAccountName: foundry.outputs.accountName
+    modelDeploymentName: foundry.outputs.modelDeploymentName
+    enableRouterControl: enableRouterControl
     searchServiceName: search.outputs.name
     appInsightsName: monitoring.outputs.appInsightsName
     appPrincipalId: identity.outputs.principalId
@@ -282,6 +313,7 @@ output AZURE_AI_PROJECT_ENDPOINT string = foundry.outputs.projectEndpoint
 output AZURE_AI_PROJECT_ID string = foundry.outputs.projectId
 output AZURE_AI_ACCOUNT_NAME string = foundry.outputs.accountName
 output AZURE_AI_MODEL_DEPLOYMENT string = foundry.outputs.modelDeploymentName
+output BUILDINGASSIST_MODEL_DEPLOYMENT_RESOURCE_ID string = foundry.outputs.modelDeploymentId
 output BUILDINGASSIST_KNOWLEDGE_MODEL_DEPLOYMENT string = foundry.outputs.knowledgeModelDeploymentName
 output BUILDINGASSIST_KNOWLEDGE_MODEL_NAME string = foundry.outputs.knowledgeModelName
 output BUILDINGASSIST_KNOWLEDGE_MODEL_RESOURCE_URI string = foundry.outputs.knowledgeModelResourceUri

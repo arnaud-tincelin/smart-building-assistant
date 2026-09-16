@@ -25,8 +25,8 @@ def test_tracing_configures_azure_monitor_without_content_capture(
     calls: dict = {}
 
     class Instrumentor:
-        def instrument(self, **kwargs) -> None:  # noqa: ANN003
-            calls["instrument"] = kwargs
+        def uninstrument(self) -> None:
+            calls["sdk_wrapper_disabled"] = True
 
     monkeypatch.setattr(settings, "enable_tracing", True)
     monkeypatch.setenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "InstrumentationKey=test")
@@ -36,12 +36,8 @@ def test_tracing_configures_azure_monitor_without_content_capture(
         lambda **kwargs: calls.update(monitor=kwargs),
     )
     monkeypatch.setattr(telemetry, "AIProjectInstrumentor", Instrumentor)
-
     assert telemetry.configure_tracing() is True
     assert telemetry.configure_tracing() is True
     assert calls["monitor"]["connection_string"] == "InstrumentationKey=test"
-    assert calls["instrument"] == {
-        "enable_content_recording": False,
-        "enable_trace_context_propagation": True,
-        "enable_baggage_propagation": False,
-    }
+    assert calls["monitor"]["logger_name"] == "buildingassist"
+    assert calls["sdk_wrapper_disabled"] is True

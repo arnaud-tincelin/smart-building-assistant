@@ -11,6 +11,31 @@ export interface Citation {
 export interface AskResponse {
   answer: string;
   citations: Citation[];
+  execution?: ModelExecution | null;
+}
+
+export type AskMode = "agents" | "gateway";
+
+export interface TokenUsage {
+  input_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  reasoning_tokens: number | null;
+  cached_tokens: number | null;
+  cache_write_tokens: number | null;
+}
+
+export interface ModelExecution {
+  mode: AskMode;
+  requested_model: string;
+  reported_model: string | null;
+  selected_model: string | null;
+  routing_mode: RoutingMode | null;
+  latency_ms: number;
+  response_id: string | null;
+  usage: TokenUsage | null;
+  tools_used: string[];
+  routing_explanation: string;
 }
 
 export interface AccessRequest {
@@ -56,12 +81,8 @@ export class ApiError extends Error {
   }
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(endpoint(path), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+async function request<T>(path: string, options: RequestInit): Promise<T> {
+  const response = await fetch(endpoint(path), options);
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;
@@ -85,8 +106,33 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function ask(question: string): Promise<AskResponse> {
-  return post<AskResponse>("/ask", { question });
+async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  return request<T>(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+}
+
+export async function ask(
+  question: string,
+  mode: AskMode = "agents",
+  signal?: AbortSignal,
+): Promise<AskResponse> {
+  return post<AskResponse>("/ask", { question, mode }, signal);
+}
+
+export async function getRoutingMode(signal?: AbortSignal): Promise<RoutingModeState> {
+  return request<RoutingModeState>("/model-router/mode", { method: "GET", signal });
+}
+
+export async function setRoutingMode(mode: RoutingMode): Promise<RoutingModeState> {
+  return request<RoutingModeState>("/model-router/mode", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode }),
+  });
 }
 
 export async function requestAccess(

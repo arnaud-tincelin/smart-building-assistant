@@ -7,9 +7,10 @@ user-assigned managed identity via ``DefaultAzureCredential``.
 
 from __future__ import annotations
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .agent_policy import AGENT_INSTRUCTIONS
+from .agent_policy import AGENT_INSTRUCTIONS, GATEWAY_INSTRUCTIONS
 
 
 class Settings(BaseSettings):
@@ -32,10 +33,19 @@ class Settings(BaseSettings):
     # Prompt agent created by the postprovision hook. Empty uses direct Responses tools.
     agent_name: str = "buildingassist-agent"
 
+    gateway_model_endpoint: str = ""
+    gateway_api_key: str = Field(default="", repr=False)
+    gateway_model: str = "gpt-5-mini"
+    gateway_instructions: str = GATEWAY_INSTRUCTIONS
+
+    # Editing changes the shared deployment, so it requires an explicit opt-in.
+    enable_router_control: bool = False
+    model_deployment_resource_id: str = ""
+
     # Authenticated Azure AI Search Knowledge Base MCP endpoint (Foundry IQ).
     knowledge_mcp_endpoint: str = ""
 
-    # APIM-hosted MCP endpoint, used only when composing Responses tools directly.
+    # APIM-hosted MCP endpoint for the gateway and direct Responses tools.
     mcp_server_url: str = ""
 
     # System instructions for the agent.

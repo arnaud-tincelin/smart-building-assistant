@@ -28,11 +28,15 @@ test("composer router selects modes with tooltips and keyboard dismissal", async
       mode = route.request().postDataJSON().mode;
       changes.push(mode);
     }
-    await route.fulfill({ json: { mode, editable: true, propagation_seconds: 300 } });
+    await route.fulfill({ json: {
+      mode, editable: true, propagation_seconds: 300,
+      model_subset: ["gpt-4o-mini", "gpt-5.6-sol"],
+    } });
   });
   await page.goto("/");
   const trigger = page.getByRole("button", { name: /^Router:/ });
   await expect(page.locator(".ask-form").getByRole("button", { name: /^Router:/ })).toBeVisible();
+  await expect(page.getByText("Router models: gpt-4o-mini / gpt-5.6-sol")).toBeVisible();
   await trigger.click();
   await expect(page.getByRole("menuitemradio", { name: "Balanced", exact: true })).toHaveAttribute("aria-checked", "true");
   for (const [label, description] of [
@@ -46,6 +50,7 @@ test("composer router selects modes with tooltips and keyboard dismissal", async
   await page.screenshot({ path: testInfo.outputPath("router-open.png"), fullPage: true });
   await page.getByRole("menuitemradio", { name: "Cost", exact: true }).click();
   await expect(trigger).toHaveAccessibleName("Router: cost");
+  await expect(page.getByText("Router models: gpt-4o-mini / gpt-5.6-sol")).toBeVisible();
   await expect(page.getByRole("menu")).toHaveCount(0);
   expect(changes).toEqual(["cost"]);
   await expect(page.getByRole("status")).toContainText("5 min");
