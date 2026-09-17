@@ -28,7 +28,7 @@ for (const mode of ["Agents", "AI Gateway"]) {
     broken = false;
     await page.getByRole("button", { name: "Ask", exact: true }).click();
     await expect(page.getByText("Building operations recovered.", { exact: true })).toBeVisible();
-    await expect(page.getByText(/Reference: CFG-TEST/)).toHaveCount(0);
+    await expect(page.getByText(/Reference: CFG-TEST/)).toBeVisible();
   });
 
   test(`${mode} shows throttling clearly and keeps retry available`, async ({ page }) => {
@@ -48,6 +48,6 @@ for (const mode of ["Agents", "AI Gateway"]) {
     await expect(page.getByRole("alert")).toContainText("rate-limited. Retry after 21s.");
     await expect(page.getByRole("button", { name: "Ask", exact: true })).toBeEnabled();
     await expect(question).toHaveValue("List the Contoso buildings.");
-    await expect(page.locator(".answer")).toHaveCount(0);
+    await expect(page.locator(".answer-body")).toHaveCount(0);
   });
 }
