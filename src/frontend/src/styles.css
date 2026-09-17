@@ -345,15 +345,60 @@ summary:focus-visible,
   color: #ffc9c9;
 }
 
-.answer {
+.conversation-history {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-height: 60vh;
   margin-top: 2rem;
-  padding: 1.5rem;
+  padding-right: 0.25rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.conversation-history:focus-visible {
+  outline: 2px solid #74c0fc;
+  outline-offset: 3px;
+}
+
+.chat-exchange {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.chat-message {
+  min-width: 0;
+  padding: 1rem 1.25rem;
   border-radius: 8px;
+}
+
+.chat-message-role {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.chat-message--user {
+  background: var(--panel-raised);
+}
+
+.chat-message--user .chat-message-body {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.chat-message--assistant {
   background: var(--panel);
 }
 
-.answer h2 {
-  margin-top: 0;
+.chat-loading {
+  margin: 0;
+  color: var(--muted);
 }
 
 .answer-body {

@@ -52,9 +52,16 @@ BuildingAssist agent, so there is no agent selector:
 - **AI Gateway** calls **gpt-5-mini** directly through the gateway. The backend runs a
   bounded, read-only building-tool loop; this path does not invoke Foundry Agent
   Service, use Model Router or Foundry IQ, or perform building actions.
-- Switching modes preserves the question, clears the previous result, and ignores
-  answers from requests started in the previous mode.
-- Each answer shows the model disclosed by the final response and the shared
+- Switching modes preserves the question, clears the conversation transcript, and
+  ignores answers from requests started in the previous mode.
+- Each ask appends the prompt and its response to a scrollable conversation
+  transcript for the active mode; earlier exchanges stay visible while new ones
+  are added, and a loading or error state is shown only next to the prompt that
+  triggered it.
+- Agent responses are rendered as Markdown (including GitHub Flavored Markdown
+  tables, lists, links, and code blocks); raw HTML/scripts embedded in a response
+  are never rendered as active page content.
+- Each answer shows the model disclosed by its own response and the shared
   router configuration at request start (or **Fixed model** for AI Gateway).
   **Show more details** expands latency,
   token usage, response ID, tool names, and routing context. Missing metadata is

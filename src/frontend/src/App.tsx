@@ -24,6 +24,14 @@ const SAMPLE_QUESTION =
 type View = "assistant" | "security";
 type AccessMethod = "badge" | "mobile";
 
+interface Exchange {
+  id: number;
+  question: string;
+  status: "loading" | "success" | "error";
+  answer?: AskResponse;
+  errorMessage?: string;
+}
+
 interface OperationState {
   loading: boolean;
   error: ApiError | null;
@@ -40,10 +48,11 @@ export function App() {
   const [view, setView] = useState<View>("assistant");
   const [mode, setMode] = useState<AskMode>("agents");
   const [question, setQuestion] = useState(SAMPLE_QUESTION);
-  const [result, setResult] = useState<AskResponse | null>(null);
+  const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
+  const nextExchangeId = useRef(0);
+  const historyRef = useRef<HTMLDivElement | null>(null);
   const [routing, setRouting] = useState<RoutingModeState | null>(null);
   const [routingLoading, setRoutingLoading] = useState(true);
   const [routingBusy, setRoutingBusy] = useState(false);
@@ -78,14 +87,18 @@ export function App() {
 
   useEffect(() => () => activeRequest.current?.abort(), []);
 
+  useEffect(() => {
+    const node = historyRef.current;
+    if (node) node.scrollTop = node.scrollHeight;
+  }, [exchanges]);
+
   function changeMode(nextMode: AskMode) {
     if (nextMode === mode) return;
     activeRequest.current?.abort();
     activeRequest.current = null;
     setLoading(false);
     setMode(nextMode);
-    setResult(null);
-    setError(null);
+    setExchanges([]);
   }
 
   async function changeRouting(nextMode: RoutingMode) {
@@ -109,15 +122,27 @@ export function App() {
     activeRequest.current?.abort();
     const controller = new AbortController();
     activeRequest.current = controller;
+    const id = nextExchangeId.current++;
+    const askedQuestion = question;
     setLoading(true);
-    setError(null);
-    setResult(null);
+    setExchanges((prev) => [...prev, { id, question: askedQuestion, status: "loading" }]);
     try {
-      const answer = await ask(question, mode, controller.signal);
-      if (!controller.signal.aborted) setResult(answer);
+      const answer = await ask(askedQuestion, mode, controller.signal);
+      if (!controller.signal.aborted) {
+        setExchanges((prev) =>
+          prev.map((exchange) =>
+            exchange.id === id ? { ...exchange, status: "success", answer } : exchange,
+          ),
+        );
+      }
     } catch (err) {
       if (!controller.signal.aborted) {
-        setError(err instanceof Error ? err.message : String(err));
+        const message = err instanceof Error ? err.message : String(err);
+        setExchanges((prev) =>
+          prev.map((exchange) =>
+            exchange.id === id ? { ...exchange, status: "error", errorMessage: message } : exchange,
+          ),
+        );
       }
     } finally {
       if (activeRequest.current === controller) {
@@ -281,44 +306,70 @@ export function App() {
           {mode === "agents" && routingMessage && (
             <p className="router-feedback" role="status">{routingMessage}</p>
           )}
-          {error && <div className="error" role="alert">{error}</div>}
 
-          {result && (
-            <section className="answer">
-              <h2>Answer</h2>
-              <div className="answer-body">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-                  table: ({ children }) => (
-                    <div className="answer-table" role="region" aria-label="Answer table" tabIndex={0}>
-                      <table>{children}</table>
-                    </div>
-                  ),
-                }}>
-                  {result.answer}
-                </ReactMarkdown>
-              </div>
-              <ExecutionDetails execution={result.execution} />
+          {exchanges.length > 0 && (
+            <div
+              className="conversation-history"
+              role="log"
+              aria-label="Conversation history"
+              aria-live="polite"
+              tabIndex={0}
+              ref={historyRef}
+            >
+              {exchanges.map((exchange) => (
+                <article key={exchange.id} className="chat-exchange">
+                  <div className="chat-message chat-message--user">
+                    <span className="chat-message-role">You</span>
+                    <p className="chat-message-body">{exchange.question}</p>
+                  </div>
+                  <div className="chat-message chat-message--assistant">
+                    <span className="chat-message-role">Assistant</span>
+                    {exchange.status === "loading" && (
+                      <p className="chat-loading" role="status">Asking…</p>
+                    )}
+                    {exchange.status === "error" && (
+                      <div className="error" role="alert">{exchange.errorMessage}</div>
+                    )}
+                    {exchange.status === "success" && exchange.answer && (
+                      <>
+                        <div className="answer-body">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                            table: ({ children }) => (
+                              <div className="answer-table" role="region" aria-label="Answer table" tabIndex={0}>
+                                <table>{children}</table>
+                              </div>
+                            ),
+                          }}>
+                            {exchange.answer.answer}
+                          </ReactMarkdown>
+                        </div>
+                        <ExecutionDetails execution={exchange.answer.execution} />
 
-              {result.citations.length > 0 && (
-                <div className="citations">
-                  <h3>Sources</h3>
-                  <ul>
-                    {result.citations.map((citation, index) => (
-                      <li key={index}>
-                        {citation.url ? (
-                          <a href={citation.url} target="_blank" rel="noreferrer">
-                            {citation.title || citation.url}
-                          </a>
-                        ) : (
-                          <span>{citation.title}</span>
+                        {exchange.answer.citations.length > 0 && (
+                          <div className="citations">
+                            <h3>Sources</h3>
+                            <ul>
+                              {exchange.answer.citations.map((citation, index) => (
+                                <li key={index}>
+                                  {citation.url ? (
+                                    <a href={citation.url} target="_blank" rel="noreferrer">
+                                      {citation.title || citation.url}
+                                    </a>
+                                  ) : (
+                                    <span>{citation.title}</span>
+                                  )}
+                                  {citation.snippet && <p className="snippet">{citation.snippet}</p>}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
                         )}
-                        {citation.snippet && <p className="snippet">{citation.snippet}</p>}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </section>
+                      </>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
           )}
         </section>
       ) : (
