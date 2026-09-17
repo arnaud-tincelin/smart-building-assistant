@@ -79,6 +79,10 @@ module modelDeployment 'model-router.bicep' = {
     modelVersion: modelVersion
     capacity: modelCapacity
   }
+  // Azure AI Services rejects concurrent deployment writes under the same account.
+  dependsOn: [
+    knowledgeModelDeployment
+  ]
 }
 
 resource knowledgeModelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
