@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("transcript retains multi-turn history in chronological order with per-response model labels", async ({ page }) => {
+test("transcript retains multi-turn history in chronological order with per-response model labels", async ({ page }, testInfo) => {
   await page.route("**/model-router/mode", (route) =>
     route.fulfill({ json: { mode: "balanced", editable: false } }),
   );
@@ -58,9 +58,11 @@ test("transcript retains multi-turn history in chronological order with per-resp
   // AC2: each response shows the model reported for that specific response.
   await expect(page.getByRole("heading", { name: "gpt-4o-mini-2024-07-18" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "gpt-4.1-2025-04-14" })).toBeVisible();
+  await history.evaluate((node) => { node.scrollTop = 0; });
+  await page.screenshot({ path: testInfo.outputPath("chat-transcript-history.png"), fullPage: true });
 });
 
-test("Markdown constructs render as semantic HTML and unsafe HTML never executes", async ({ page }) => {
+test("Markdown constructs render as semantic HTML and unsafe HTML never executes", async ({ page }, testInfo) => {
   await page.route("**/model-router/mode", (route) =>
     route.fulfill({ json: { mode: "balanced", editable: false } }),
   );
@@ -107,9 +109,10 @@ test("Markdown constructs render as semantic HTML and unsafe HTML never executes
   await expect(page.locator("script", { hasText: "__xss" })).toHaveCount(0);
   const executed = await page.evaluate(() => (window as unknown as { __xss?: boolean }).__xss);
   expect(executed).toBeUndefined();
+  await page.screenshot({ path: testInfo.outputPath("chat-transcript-markdown.png"), fullPage: true });
 });
 
-test("conversation history scrolls vertically without causing horizontal page overflow", async ({ page }) => {
+test("conversation history scrolls vertically without causing horizontal page overflow", async ({ page }, testInfo) => {
   await page.route("**/model-router/mode", (route) =>
     route.fulfill({ json: { mode: "balanced", editable: false } }),
   );
@@ -131,6 +134,7 @@ test("conversation history scrolls vertically without causing horizontal page ov
 
   const overflow = await history.evaluate((node) => node.scrollHeight > node.clientHeight);
   expect(overflow).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("chat-transcript-scroll.png"), fullPage: true });
 
   await history.evaluate((node) => { node.scrollTop = 0; });
   await expect(page.getByText("Question number 0")).toBeVisible();
