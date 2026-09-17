@@ -306,7 +306,8 @@ resource backendSecurityErrorAlert 'Microsoft.Insights/scheduledQueryRules@2023-
     criteria: {
       allOf: [
         {
-          query: 'AppTraces | where AppRoleName == "buildingassist-backend" | where Message has "Security control operation failed"'
+          // The failure is logged with exc_info, so Azure Monitor records it in AppExceptions, not AppTraces.
+          query: 'union isfuzzy=true AppTraces, AppExceptions | where AppRoleName == "buildingassist-backend" | where Message has "Security control operation failed" or OuterMessage has "Security control operation failed"'
           timeAggregation: 'Count'
           operator: 'GreaterThan'
           threshold: 0
