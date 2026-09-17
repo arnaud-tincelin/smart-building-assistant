@@ -79,6 +79,9 @@ module modelDeployment 'model-router.bicep' = {
     modelVersion: modelVersion
     capacity: modelCapacity
   }
+  dependsOn: [
+    knowledgeModelDeployment
+  ]
 }
 
 resource knowledgeModelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
